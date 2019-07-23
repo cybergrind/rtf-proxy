@@ -1,0 +1,2 @@
+WINEPREFIX=/home/kpi/games/rotf/wine wine flashplayer_18_sa.exe 'https://rotf.io/assets/swf/client.swf?build=release'
+# WINEPREFIX=/home/kpi/games/rotf/wine wine flashplayer_18_sa.exe client.swf
