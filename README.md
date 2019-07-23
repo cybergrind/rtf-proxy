@@ -15,13 +15,11 @@ base string
 
 
 ```
-iptables -t nat -A OUTPUT -s 192.168.88.34 -d 192.223.31.195 -p tcp --dport 2050 -j REDIRECT --to 9995
 iptables -t nat -A OUTPUT -s 192.168.88.34 -d 192.223.31.195 -p tcp --dport 2050 -j REDIRECT --to-port 9995
-iptables -t nat -A OUTPUT -s 192.168.88.34 -d 192.223.31.195 -p tcp --dport 2051 -j REDIRECT --to-port 2050 --to-destination 192.223.31.195
-
 iptables -t nat -A OUTPUT -s 192.168.88.34 -d 192.223.31.195 -p tcp --dport 2051 -j DNAT --to 192.223.31.195:2050
 ```
 
 ```
-iptables -D OUTPUT  -s 192.168.88.34 -d 192.223.31.195 -p tcp --dport 2050 -j REDIRECT --to 9995
+iptables -t nat -D OUTPUT -s 192.168.88.34 -d 192.223.31.195 -p tcp --dport 2050 -j REDIRECT --to 9995
+iptables -t nat -D OUTPUT -s 192.168.88.34 -d 192.223.31.195 -p tcp --dport 2051 -j DNAT --to 192.223.31.195:2050
 ```
