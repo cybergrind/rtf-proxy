@@ -38,3 +38,8 @@ oo
 tipsi_web/venv/
 */.idea/
 venv
+wine
+*.bin
+*.exe
+*.log
+rtf_proxy/structs
