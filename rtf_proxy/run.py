@@ -91,7 +91,7 @@ async def out_loop(log, reader, writer):
             out = struct.unpack('!BIIII', payload)
             mypos = [out[3], out[4]]
             pass
-        log.write(f'Outgoing: Size: {_size_bytes} Payload: {format_packet(payload)}\n\n')
+        log.write(f'Outgoing [{counter}]: Size: {_size_bytes} Payload: {format_packet(payload)}\n\n')
         if not skip:
             writer.write(size)
             writer.write(payload)
@@ -189,7 +189,7 @@ async def in_loop(log, reader, writer):
             pass
         # print(f'Got payload: {payload}')
         log.write(
-            f'Incoming: Size: {_size_bytes}/{len(payload)}/{size} Payload: {format_packet(payload)}\n\n'
+            f'Incoming [{counter}]: Size: {_size_bytes}/{len(payload)}/{size} Payload: {format_packet(payload)}\n\n'
         )
         if not skip:
             writer.write(size)
