@@ -1,50 +1,148 @@
 meta:
-  id: rotf85
-  file-extension: rotf85
+  id: rotf79
+  file-extension: rotf79
   endian: be
   encoding: ascii
 
 seq:
   - id: p_type
     type: u1
-  - id: ts
-    type: u8
-  - id: num_objs
+  - id: maybe_size
     type: u2
-  - id: objects
-    type: obj_info
+  - id: maybe_terrain_info
+    type: unk
     repeat: expr
-    repeat-expr: num_objs
-  - id: rest
-    size-eos: true
+    repeat-expr: maybe_size
+  - id: num_entries
+    type: u2
+  - id: entry
+    type: entry
+    repeat: expr
+    repeat-expr: num_entries
+  - id: unk_s00
+    type: u2
+  - id: switch
+    type: u2
+  - id: some_int_when_03
+    if: switch == 0x3
+    type: u4
+  - id: indicator_06
+    if: switch == 0x02
+    type: u1
+  - id: value_06
+    if: switch == 0x02
+    type: u4
+  - id: magic_6300
+    type: u2
+  - id: indicator_04
+    type: u1
+  - id: magic_31293139
+    type: u4
     
 types:
-  obj_info:
-    meta:
-      title: TTTT
+  unk:
     seq:
+      - id: unk_s
+        type: u2
+      - id: unk_s2
+        type: u2
+      - id: unk_s3
+        type: u2
+  entry:
+    seq:
+      - id: some_short
+        type: u2
       - id: id
         type: u4
-      - id: x_pos
+      - id: pos_x
         type: u4
-      - id: y_pos
+      - id: pos_y
         type: u4
       - id: obj_type
         type: u2
-      - id: object
-        type:
-          switch-on: obj_type
-          cases:
-            0: dummy
-            0x1a: player
-            0x18: player
-            2: type_02
-            1: type_01
-            6: type_06
-            4: type_04
-            3: type_03
-            8: type_08
-            9: type_09
+      - id: dungeon
+        if: obj_type == 0x05
+        type: dungeon_info
+      - id: enemy
+        if: obj_type == 0x07
+        type: enemy_info
+      - id: player
+        if: obj_type == 0x1a
+        type: player
+      - id: player_18
+        if: obj_type == 0x18
+        type: player
+      - id: terrain
+        if: obj_type == 0x04
+        type: terrain
+  terrain:
+    seq:
+      - id: name_indicator_1f
+        type: u1
+      - id: name
+        type: sized_str
+      - id: indicator_02
+        type: u1
+      - id: value_02
+        type: u4
+      - id: some_indicator_01
+        type: u1
+      - id: somve_value_01
+        type: u4
+      
+  dungeon_info:
+    seq:
+      - id: name_indicator_1f
+        type: u1
+      - id: dung_name
+        type: sized_str
+      - id: indicator_02
+        type: u1
+      - id: value_02
+        type: u4
+      - id: indicator_01
+        type: u1
+      - id: value_01
+        type: u4
+      - id: indicator_00
+        type: u1
+      - id: value_00
+        type: u4
+  enemy_info:
+    seq:
+      - id: name_indicator_1f
+        type: u1
+      - id: enemy_name
+        type: sized_str
+      - id: indicator_02
+        type: u1
+      - id: value_02
+        type: u4
+      - id: indicator_01
+        type: u1
+      - id: value_01
+        type: u4
+      - id: indicator_15
+        type: u1
+      - id: value_15
+        type: u4
+      - id: indicator_76
+        type: u1
+      - id: value_76
+        type: u4
+      - id: indicator_00
+        type: u1
+      - id: value_00
+        type: u4
+  sized_str:
+    seq:
+      - id: size
+        type: u2
+      - id: name
+        type: str
+        size: size
+      - id: sometimes_yyyy
+        size: 5
   player:
     seq:
       - id: name_indicator_1f
@@ -165,105 +263,3 @@ types:
         type: u1
       - id: value_60
         type: u4
-  type_01:
-    seq:
-      - id: some_id
-        type: u1
-      
-      - id: unkn
-        type:
-          switch-on: some_id
-          cases:
-            4: t_01_04
-            1: t_01_01
-  type_02:
-    seq:
-      - id: unk
-        size: 10
-  t_01_04:
-    seq:
-      - id: unk
-        size: 4
-  t_01_01:
-    seq:
-      - id: unk
-        size: 4
-  type_03:
-    seq:
-      - id: unk
-        size: 15
-        
-  type_08:
-    seq:
-      - id: unk
-        size: 40
-        
-  type_09:
-    seq:
-      - id: unk
-        size: 45
-  type_06:
-    seq:
-      - id: name_indicator_1f
-        contents: [0x1f]
-      - id: name
-        type: sized_name
-      - id: indicator_3d
-        type: u1
-      - id: value_3d
-        type: u4
-      - id: indicator_02
-        type: u1
-      - id: value_02
-        type: u4
-      - id: indicator_01
-        type: u1
-      - id: value_01
-        type: u4
-      - id: indicator_1d
-        type: u1
-      - id: value_1d
-        type: u4
-      - id: indicator_60
-        type: u1
-      - id: value_60
-        type: u4
-  sized_name:
-    seq:
-      - id: size
-        type: u2
-      - id: name
-        type: str
-        size: size
-  type_04:
-    seq:
-      - id: switch
-        type: u1
-      - id: content
-        type:
-          switch-on: switch
-          cases:
-            0x1f: type_04_named
-            1: type_04_dummy
-  type_04_dummy:
-    seq:
-      - id: dummy
-        size: 19
-  type_04_named:
-    seq:
-      - id: name
-        type: sized_name
-      - id: indicator_3d
-        type: u1
-      - id: value_3d
-        type: u4
-      - id: indicator_02
-        type: u1
-      - id: value_02
-        type: u4
-      - id: indicator_01
-        type: u1
-      - id: value_01
-        type: u4
-  dummy: {}
-    

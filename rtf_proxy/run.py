@@ -47,6 +47,7 @@ def save_packet(packet):
     with open(f'packets/sample_{_type}_{counter:04d}.bin', 'wb') as f:
         f.write(packet)
 
+
 async def out_loop(log, reader, writer):
     global mypos
     while True:
@@ -166,8 +167,8 @@ async def in_loop(log, reader, writer):
         _type = struct.unpack('!B', payload[:1])[0]
         # 23 - message
         # 75 - enemy shots?
-        # 79 - map
-        # 85 - object move? H(type)I(id)I(numthen)
+        # 79 - map update
+        # 85 - object move?
         if _type not in (21, 22, 26, 23, 78, 79, 83, 85, 87, 93, 155):
             print(format_packet(payload[:100]))
 
@@ -183,7 +184,8 @@ async def in_loop(log, reader, writer):
             # skip = True
         elif _type == 75:
             # skip = True
-            unp75(payload)
+            # unp75(payload)
+            # save_packet(payload)
             pass
         # print(f'Got payload: {payload}')
         log.write(
