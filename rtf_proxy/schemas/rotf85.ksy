@@ -42,6 +42,9 @@ types:
             "objs::type_01": type_01
             "objs::type_06": type_06
             "objs::type_04": type_04
+            "objs::type_03": type_03
+            "objs::type_08": type_08
+            "objs::type_09": type_09
   player:
     seq:
       - id: some_nu
@@ -168,6 +171,20 @@ types:
     seq:
       - id: unk
         size: 4
+  type_03:
+    seq:
+      - id: unk
+        size: 15
+        
+  type_08:
+    seq:
+      - id: unk
+        size: 40
+        
+  type_09:
+    seq:
+      - id: unk
+        size: 45
   type_06:
     seq:
       - id: name
@@ -225,4 +242,7 @@ enums:
     2: type_02
     6: type_06
     4: type_04
+    3: type_03
+    8: type_08
+    9: type_09
     
