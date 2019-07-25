@@ -8,7 +8,7 @@ pos = [0, 0]
 mypos = [0, 0]
 samples = 0
 stats = defaultdict(int)
-
+counter = 0
 enemies = {}
 
 
@@ -39,6 +39,13 @@ def get_enemy():
         out.sort(key=lambda x: x['dist'])
         return out[0]
 
+
+def save_packet(packet):
+    global counter
+    counter += 1
+    _type = struct.unpack('!B', packet[:1])[0]
+    with open(f'packets/sample_{_type}_{counter:04d}.bin', 'wb') as f:
+        f.write(packet)
 
 async def out_loop(log, reader, writer):
     global mypos
