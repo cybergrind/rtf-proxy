@@ -2,6 +2,7 @@ meta:
   id: rotf85
   imports:
     - player
+    - base
   file-extension: rotf85
   endian: be
   encoding: ascii
@@ -31,23 +32,8 @@ types:
         type: u4
       - id: y_pos
         type: u4
-      - id: obj_type
-        type: u2
       - id: object
-        type:
-          switch-on: obj_type
-          cases:
-            0: dummy
-            0x1a: player
-            0x1b: player
-            0x18: player
-            2: type_02
-            1: type_01
-            6: type_06
-            4: type_04
-            3: type_03
-            8: type_08
-            9: type_09
+        type: base
   type_01:
     seq:
       - id: some_id
