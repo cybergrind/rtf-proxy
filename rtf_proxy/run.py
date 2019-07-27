@@ -31,6 +31,8 @@ async def out_loop(state, reader, writer):
             return
         if writer.is_closing():
             return
+        if state.kill and not writer.is_closing():
+            writer.close()
         _size_bytes = struct.unpack('!I', size)[0] - 4
         # print(f'Out Got size: {size} => {_size_bytes}')
         payload = await reader.read(_size_bytes)
@@ -81,9 +83,6 @@ async def out_loop(state, reader, writer):
         else:
             print('Skip packet...')
 
-        if writer.is_closing():
-            return
-
 
 async def in_loop(state, reader, writer):
     while True:
@@ -94,6 +93,9 @@ async def in_loop(state, reader, writer):
 
         if writer.is_closing():
             return
+        if state.kill and not writer.is_closing():
+            writer.close()
+
         _size_bytes = struct.unpack('!I', size)[0] - 4
         # print(f'In Got size: {size} => {_size_bytes}')
         payload = await reader.read(_size_bytes)
@@ -159,8 +161,6 @@ async def in_loop(state, reader, writer):
             writer.write(payload)
         else:
             print('Skip package')
-        if writer.is_closing():
-            return
 
 
 async def handle_incoming(local_reader, local_writer):

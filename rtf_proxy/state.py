@@ -12,6 +12,7 @@ class State:
         self.mypos = [0, 0]
         self.me = None
         self.safe = True
+        self.kill = False
         self.enemies = {}
         self.is_test = is_test
         self.log = io.StringIO() if is_test else open('messages.log', 'w')
@@ -35,6 +36,7 @@ class State:
         self.stats[_type] += 1
 
     def close(self):
+        self.kill = True
         self.log.write(json.dumps(self.stats, indent=4, sort_keys=True))
         self.log.close()
 
