@@ -40,6 +40,7 @@ async def out_loop(state, reader, writer):
         # 27 - shot ack?
         # 51 - position
         # 82 - shot
+        # 156 - set runes
         if _type in (None,):
             save_packet(state, payload)
             # print(format_packet(payload))
