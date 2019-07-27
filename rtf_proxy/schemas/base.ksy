@@ -3,16 +3,14 @@ meta:
   file-extension: base
   endian: be
   encoding: ascii
-
+seq:
+  - id: num_fields
+    type: u2
+  - id: dct
+    type: kv
+    repeat: expr
+    repeat-expr: num_fields
 types:
-  base:
-    seq:
-      - id: num_fields
-        type: u2
-      - id: dict
-        type: kv
-        repeat: expr
-        repeat-expr: num_fields
   kv:
     seq:
       - id: key
@@ -40,7 +38,7 @@ types:
     seq:
       - id: size
         type: u2
-      - id: clan_name
+      - id: name
         type: str
         size: size
   str_var:

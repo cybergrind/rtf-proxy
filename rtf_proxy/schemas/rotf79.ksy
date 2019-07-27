@@ -1,7 +1,6 @@
 meta:
   id: rotf79
   imports:
-    - player
     - base
   file-extension: rotf79
   endian: be
@@ -18,7 +17,7 @@ seq:
     repeat-expr: terrain_size
   - id: num_entries
     type: u2
-  - id: entry
+  - id: entries
     type: entry
     repeat: expr
     repeat-expr: num_entries
@@ -48,6 +47,8 @@ seq:
     type: u1
   - id: magic_31293139
     type: u4
+  - id: rest
+    size-eos: true
 types:
   unk:
     seq:
