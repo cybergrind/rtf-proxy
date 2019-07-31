@@ -37,8 +37,8 @@ seq:
     repeat-expr: size
     
     
-  - id: unk_byte
-    type: unk_byte
+  - id: num_bullets
+    type: num_bullets
     repeat: expr
     repeat-expr: size
     
@@ -76,9 +76,9 @@ types:
     seq:
       - id: maybe_damage
         type: u2
-  unk_byte:
+  num_bullets:
     seq:
-      - id: unk
+      - id: num_bullets
         type: u1
   magic:
     seq:

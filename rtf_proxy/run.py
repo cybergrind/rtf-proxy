@@ -6,6 +6,7 @@ import struct
 from rtf_proxy.packet_tools import format_packet, print_unpack, save_packet, encode_packet
 from rtf_proxy.state import new_state
 from rtf_proxy.obj_analysis import analyze_objects
+from rtf_proxy.bullet_analysis import process_bullet
 
 
 VAULT_PACKET = b'\x01\x00\x05Vault\x00\x00\x00\x00\x00\x00\x08\x02\x00\x00ai'
@@ -122,7 +123,7 @@ async def in_loop(state, reader, writer):
                 state.safe = False
             print(f'Location to: {state.safe}')
 
-        if _type in (None, ):
+        if _type in (75, 40):
             save_packet(state, payload)
 
         # if b'\x00\x00\x03\xdb' in payload:
@@ -136,6 +137,7 @@ async def in_loop(state, reader, writer):
             #         f.write(payload)
             # unp85(payload)
         elif _type == 75:
+            payload = process_bullet(state, payload)
             # skip = True
             # unp75(payload)
             # save_packet(state, payload)
@@ -148,7 +150,12 @@ async def in_loop(state, reader, writer):
             pass
         if _type in (79, 85):
             analyze_objects(state, payload)
-        if not state.safe and state.hp_level < 0.5:
+            if b'cybergrind' in payload:
+                # print('REPLACE!!!!')
+                # payload.replace(b'\x00\x08\x00\x00#g', b'\x00\x08\x00\x00#h')
+                # payload.replace(b'\x06110601|\x00\x00\x00$', b'\x06110601|\x00\x00\x00\x88')
+                pass
+        if not state.safe and (state.hp_level < 0.5 and state.hp < 600):
             print(f'Critical level: {state.hp_level}')
             goto_vault()
         # print(f'Got payload: {payload}')

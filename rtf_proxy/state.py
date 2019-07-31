@@ -41,6 +41,12 @@ class State:
         self.log.close()
 
     @property
+    def hp(self):
+        if not self.me:
+            return 1000
+        return self.me.dct['hp']
+
+    @property
     def hp_level(self):
         if not self.me:
             return 1
