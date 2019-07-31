@@ -123,7 +123,7 @@ async def in_loop(state, reader, writer):
                 state.safe = False
             print(f'Location to: {state.safe}')
 
-        if _type in (75, 40):
+        if _type in (85,):
             save_packet(state, payload)
 
         # if b'\x00\x00\x03\xdb' in payload:
@@ -149,7 +149,7 @@ async def in_loop(state, reader, writer):
             # save_packet(state, payload)
             pass
         if _type in (79, 85):
-            analyze_objects(state, payload)
+            payload = analyze_objects(state, payload)
             if b'cybergrind' in payload:
                 # print('REPLACE!!!!')
                 # payload.replace(b'\x00\x08\x00\x00#g', b'\x00\x08\x00\x00#h')

@@ -1,18 +1,51 @@
-import glob
 import asyncio
+import glob
 import struct
-from rtf_proxy.structs.rotf85 import Rotf85
-from rtf_proxy.structs.rotf79 import Rotf79
+from enum import Flag, auto
+
 from rtf_proxy.packet_tools import save_packet
 from rtf_proxy.state import new_state
+from rtf_proxy.structs.rotf79 import Rotf79
+from rtf_proxy.structs.rotf85 import Rotf85
 
-
-unpackers = {
-    79: Rotf79,
-    85: Rotf85
-}
+unpackers = {79: Rotf79, 85: Rotf85}
 
 look_name = 'cybergind'
+
+
+class STATUS(Flag):
+    B1 = auto()
+    SILENT = auto()
+    B3 = auto()
+    SLOW = auto()
+    B5 = auto()  # skull
+    SLOW_ATTACK = auto()
+    STAR = auto()  # NO ATTACK
+    BLIND = auto()
+    HALLUCINATING = auto()
+    DRUNK = auto()
+    CONFUSED = auto()
+    B12 = auto()
+    INVISIBLE = auto()
+    PARALYZED = auto()
+    SPEEDY = auto()
+    BLEEDING = auto()
+    B17 = auto()
+    HEALING = auto()
+    DAMAGING = auto()
+    BERSERK = auto()
+    DISABLED = auto()  # GRAY
+    BLACK_WHITE = auto()
+    B23 = auto()
+    B24 = auto()
+    INVULN = auto()
+    BROWN_ARMOR = auto()
+    CROSS = auto()
+    IM_PET = auto()
+    SPEEDY2 = auto()
+    UNSTABLE = auto()
+    DARKNESS = auto()
+    B32 = auto()
 
 
 class GameObject:
@@ -24,13 +57,51 @@ class GameObject:
         0x01: ('hp', 'value'),
         0x03: ('max_mp', 'value'),
         0x04: ('mp', 'value'),
+        0x1d: ('status', 'value'),
     }
 
-    def __init__(self, state, entry):
+    def __init__(self, state, entry, payload):
         self.state = state
         self.entry = entry
+        self.payload = payload
         self.dct = {}
         self.decode_object(entry.object)
+
+    reset_flags = ~(
+        STATUS.SILENT
+        | STATUS.SLOW
+        | STATUS.SLOW_ATTACK
+        | STATUS.STAR
+        | STATUS.BLIND
+        | STATUS.HALLUCINATING
+        | STATUS.DRUNK
+        | STATUS.CONFUSED
+        | STATUS.PARALYZED
+        | STATUS.DISABLED
+        | STATUS.IM_PET
+        | STATUS.UNSTABLE
+        | STATUS.DARKNESS
+    )
+    set_flags = STATUS.DAMAGING | STATUS.SPEEDY | STATUS.BERSERK | STATUS.SPEEDY2
+
+    def reset_effects(self):
+        if not hasattr(self.entry, 'x_pos'):
+            return
+        print(f'{STATUS(self.dct["status"])}')
+        b = struct.pack('!III', self.entry.id, self.entry.x_pos, self.entry.y_pos)
+        self.position = self.payload.find(b)
+        spack = struct.pack('!BI', 0x1d, self.dct['status'])
+        self.flags_position = self.payload.find(spack, self.position)
+        print(
+            f'{self.position} : {self.flags_position} => {self.payload[self.position:self.flags_position + 20]}'
+        )
+        status = STATUS(self.dct['status'])
+        new_status = ((status & self.reset_flags) | self.set_flags).value
+        if self.dct['status'] != new_status:
+            print(f'Replace status: {status} => {STATUS(new_status)}')
+            self.payload[self.flags_position : self.flags_position + 5] = spack = struct.pack(
+                '!BI', 0x1d, new_status
+            )
 
     def decode_object(self, obj):
         if obj.num_fields == 0:
@@ -42,23 +113,38 @@ class GameObject:
         if self.dct.get('name') == 'cybergrind':
             self.state.me = self
 
+        """
+        status:
+        invuln: 16777216
+        blind: {'status': 8388608, '0x60': 65536} {'hp': 857, 'status': 128, '0x60': 0}
+        silent: 'status': 2,
+        slow: status: 8
+        """
         if self.state.me and self.state.me.entry.id == self.entry.id:
             self.state.me.dct.update(self.dct)
-            print(self.dct)
+            _type = struct.unpack('!B', self.payload[:1])[0]
+            if self.dct.get('status'):
+                print(f'Ptype: {_type} => {self.dct}')
+                if self.dct['status'] != 0:
+                    self.reset_effects()
+                    # import ipdb; ipdb.set_trace()
+
             # print(self.state.me.dct)
 
 
 def analyze_objects(state, payload):
+    payload = bytearray(payload)
     _type = struct.unpack('!B', payload[:1])[0]
     if _type not in (79, 85):
         print(f'Wrong packet in analyze_objects: {_type}')
     obj = log_unpack(state, unpackers[_type], payload)
     if not obj:
-        return
+        return bytes(payload)
     # print('ok packet')
     if obj.num_entries > 0:
         for entry in obj.entries:
-            GameObject(state, entry)
+            GameObject(state, entry, payload)
+    return bytes(payload)
 
 
 def log_unpack(state, unpacker, payload, log_all=False):
@@ -120,7 +206,7 @@ def unp85(packet):
 
 def main():
     state = new_state(is_test=True)
-    for fname in glob.glob('packets/*.bin'):
+    for fname in glob.glob('packets/*.rotf85'):
         with open(fname, 'rb') as f:
             payload = f.read()
             analyze_objects(state, payload)
