@@ -1,3 +1,4 @@
+from binascii import hexlify
 import struct
 
 

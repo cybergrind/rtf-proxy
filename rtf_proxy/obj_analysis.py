@@ -61,6 +61,7 @@ class GameObject:
     }
 
     def __init__(self, state, entry, payload):
+        self._position = None
         self.state = state
         self.entry = entry
         self.payload = payload
@@ -84,12 +85,33 @@ class GameObject:
     )
     set_flags = STATUS.DAMAGING | STATUS.SPEEDY | STATUS.BERSERK | STATUS.SPEEDY2
 
-    def reset_effects(self):
+    @property
+    def position(self):
+        if self._position:
+            return self._position
         if not hasattr(self.entry, 'x_pos'):
             return
-        print(f'{STATUS(self.dct["status"])}')
         b = struct.pack('!III', self.entry.id, self.entry.x_pos, self.entry.y_pos)
-        self.position = self.payload.find(b)
+        self._position = self.payload.find(b)
+        return self._position
+
+    def fix_items(self):
+        if not hasattr(self.entry, 'x_pos') or not self.dct['0x9']:
+            return
+        return
+        spack = struct.pack('!BI', 0x9, self.dct['0x9'])
+        location = self.payload.find(spack, self.position)
+        assert self.payload[location : location + 5] == spack, spack
+        new_item = 2730
+        if self.dct['0x9'] != new_item:
+            print(f'Replace skull: {self.dct["0x9"]} => {new_item}')
+            self.payload[location : location + 5] = struct.pack('!BI', 0x9, new_item)
+
+    def reset_effects(self):
+        if not hasattr(self.entry, 'x_pos'):
+            print(f'No pos effect: {STATUS(self.dct["status"])}')
+            return
+        print(f'{STATUS(self.dct["status"])}')
         spack = struct.pack('!BI', 0x1d, self.dct['status'])
         self.flags_position = self.payload.find(spack, self.position)
         print(
@@ -97,6 +119,7 @@ class GameObject:
         )
         status = STATUS(self.dct['status'])
         new_status = ((status & self.reset_flags) | self.set_flags).value
+        self.state.good_status = new_status
         if self.dct['status'] != new_status:
             print(f'Replace status: {status} => {STATUS(new_status)}')
             self.payload[self.flags_position : self.flags_position + 5] = spack = struct.pack(
@@ -110,8 +133,12 @@ class GameObject:
             key = kv.key
             dct_key, dct_value = self.mapping.get(key, (hex(key), 'value'))
             self.dct[dct_key] = getattr(kv.value, dct_value)
+        if self.entry.id in self.state.enemies and hasattr(self.entry, 'pos_x'):
+            self.state.add_enemy(self.entry.id, self.entry.pos_x, self.entry.pos_y)
         if self.dct.get('name') == 'cybergrind':
             self.state.me = self
+            if hasattr(self.entry, 'x_pos'):
+                self.state.set_mypos(self.entry.x_pos, self.entry.y_pos)
 
         """
         status:
@@ -119,17 +146,39 @@ class GameObject:
         blind: {'status': 8388608, '0x60': 65536} {'hp': 857, 'status': 128, '0x60': 0}
         silent: 'status': 2,
         slow: status: 8
+        0x9 => totem: 22880, medusa: 22351
+        Medusa: Ptype: 85 => {'0x8': 2320, '0x9': 22880, '0xa': 2512, '0xb': 2985, 'max_hp': 863, 'max_mp': 490, '0x2e': 240, '0x2f': 105, 'mp': 490}
+        Ptype: 85 => {'0x8': 2320, '0x9': 22880, '0xa': 2512, '0xb': 2985, 'max_hp': 863, 'max_mp': 490, '0x2e': 240, '0x2f': 105, 'mp': 490}
+Ptype: 85 => {'0x8': 2320, '0x9': 22351, '0xa': 2512, '0xb': 2985, 'max_hp': 863, 'max_mp': 610, '0x2e': 240, '0x2f': 225, 'mp': 492}
+
         """
         if self.state.me and self.state.me.entry.id == self.entry.id:
             self.state.me.dct.update(self.dct)
             _type = struct.unpack('!B', self.payload[:1])[0]
-            if self.dct.get('status'):
+            if len(self.dct) > 1:
                 print(f'Ptype: {_type} => {self.dct}')
-                if self.dct['status'] != 0:
-                    self.reset_effects()
-                    # import ipdb; ipdb.set_trace()
-
+            if self.dct.get('status'):
+                self.reset_effects()
+                # import ipdb; ipdb.set_trace()
+            if self.dct.get('0x9'):
+                self.fix_items()
             # print(self.state.me.dct)
+
+
+async def artificial_status(state, writer):
+    while True:
+        await asyncio.sleep(1)
+        if writer.is_closing():
+            return
+        if state.safe:
+            continue
+        me = state.me.entry
+        mask = '!BQHIIIHBI'
+        pl = struct.pack(mask, 85, state.ts + 1,
+                         1, me.id, me.x_pos, me.y_pos, 1, 0x1d,
+                         state.good_status)
+        print(f'Write pl: {pl}')
+        writer.write(pl)
 
 
 def analyze_objects(state, payload):
@@ -141,6 +190,8 @@ def analyze_objects(state, payload):
     if not obj:
         return bytes(payload)
     # print('ok packet')
+    if hasattr(obj, 'ts'):
+        state.ts = obj.ts
     if obj.num_entries > 0:
         for entry in obj.entries:
             GameObject(state, entry, payload)

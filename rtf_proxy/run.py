@@ -5,8 +5,8 @@ import struct
 
 from rtf_proxy.packet_tools import format_packet, print_unpack, save_packet, encode_packet
 from rtf_proxy.state import new_state
-from rtf_proxy.obj_analysis import analyze_objects
-from rtf_proxy.bullet_analysis import process_bullet
+from rtf_proxy.obj_analysis import analyze_objects, artificial_status
+from rtf_proxy.bullet_analysis import process_bullet, outcoming_shot, bullet_double
 
 
 VAULT_PACKET = b'\x01\x00\x05Vault\x00\x00\x00\x00\x00\x00\x08\x02\x00\x00ai'
@@ -39,17 +39,23 @@ async def out_loop(state, reader, writer):
         payload = await reader.read(_size_bytes)
         _type = struct.unpack('!B', payload[:1])[0]
         # 27 - shot ack?
+        # 35 - shot landed ack?
         # 51 - position
+        # 76 - bullet is landed
         # 82 - shot
+        # 89 - shot landed in something else / wall
         # 156 - set runes
-        if _type in (None,):
+        if _type not in (3, 27, 30, 51, 82, 84, 154):
+            print(f'Out: {format_packet(payload[:100])}')
+        if _type in (35, 89):
             save_packet(state, payload)
             # print(format_packet(payload))
 
         # if b'\x00\x00\x03\xdb' in payload:
         #     print(f'Health in out: {format_packet(payload)}')
 
-        if _type == 82 and _size_bytes == 24:
+        if _type == 82:
+            payload = outcoming_shot(state, payload)
             # print_unpack('!BIHBIIfI', payload)
             # o = list(struct.unpack('!BIHBIIfI', payload))
             # x, y, angle = o[4], o[5], o[6]
@@ -71,11 +77,18 @@ async def out_loop(state, reader, writer):
             #     modify[3] = 155
             # payload = struct.pack('!BIHBIIfI', *modify)
             pass
+        elif _type in (35,):
+            skip = True
+        elif _type == 76:
+            # skip = True
+            # payload = bullet_double(payload)
+            if not payload:
+                skip = True
         elif _type == 51 and _size_bytes == 17:
             # print(format_packet(payload))
             # print_unpack('!BIIII', payload)
             out = struct.unpack('!BIIII', payload)
-            mypos = [out[3], out[4]]
+            state.set_mypos(out[3], out[4])
             pass
         state.count_packet(payload)
         state.log.write(f'Outgoing [{state.counter}]: Size: {_size_bytes} Payload: {format_packet(payload)}\n\n')
@@ -87,6 +100,7 @@ async def out_loop(state, reader, writer):
 
 
 async def in_loop(state, reader, writer):
+    # asyncio.create_task(artificial_status(state, writer))
     while True:
         skip = False
         size = await reader.read(4)
@@ -114,16 +128,17 @@ async def in_loop(state, reader, writer):
         # 85 - object move?
         # 159 - change realm?
         if _type not in (9, 21, 22, 26, 23, 27, 75, 78, 79, 82, 83, 85, 87, 93, 155):
-            print(format_packet(payload[:100]))
+            print(f'In: {format_packet(payload[:100])}')
 
         if _type in (1,):
+            state.enemies = {}
             if any([x in payload for x in SAFE_LOCATIONS]):
                 state.safe = True
             else:
                 state.safe = False
             print(f'Location to: {state.safe}')
 
-        if _type in (85,):
+        if _type in (None,):
             save_packet(state, payload)
 
         # if b'\x00\x00\x03\xdb' in payload:
