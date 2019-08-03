@@ -55,10 +55,20 @@ async def out_loop(state, reader, writer):
         # 89 - shot landed in something else / wall
         # 98 - damaged by terrain?
         # 156 - set runes
+        # 49 - use
+        # 59 - move to inventory
+        # 102 - drop
+        # Out: Type: (49,) Payload: b'1\x00$$\x13\x00\x04\xaa8\x00\x00\x00S?\x00\x00\x00\x00\x00\x00\x00\x00\x01'
+        # Ptype: 85 => {'mp': 1, 'status': 0, '0x60': 0}
+        # Out: Type: (49,) Payload: b'1\x00$C\x06\x00\x04\xaa8\x00\x00\x00\n \x00\x00\x00\x00\x00\x00\x00\x00\x01'
+        # Unpack + Use
+        # Out: Type: (49,) Payload: b'1\x00+d\xe7\x00\x04a\x8c\x00\x00\x00S?\x00\x00\x00\x00\x00\x00\x00\x00\x01'
+        # Out: Type: (49,) Payload: b'1\x00+k\xcd\x00\x04a\x8c\x00\x00\x00\n4\x00\x00\x00\x00\x00\x00\x00\x00\x01'
+
         if _type not in (3, 27, 30, 31, 35, 51, 76, 82, 84, 80, 89, 154):
             print(f'Out: {format_packet(payload[:100])}')
 
-        if _type in (98,):
+        if _type in (49, 59, 102) and False:
             save_packet(state, payload)
             # print(format_packet(payload))
 
@@ -147,7 +157,7 @@ async def in_loop(state, reader, writer):
                 state.safe = False
             print(f'Location to: {state.safe}')
 
-        if _type in (None, 75):
+        if _type in (None, 36):
             save_packet(state, payload)
 
         # if b'\x00\x00\x03\xdb' in payload:

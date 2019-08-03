@@ -176,6 +176,10 @@ def process_aoe_dmg(state, payload):
     if _type == 36:
         assert len(payload) == 15
         dmg = payload[7]
+        _type, landed_on, flag, dmg, some_short, from_who, some_flag2 = struct.unpack('!BIHBHIB', payload)
+        print(f'ME: {state.me.entry.id} => TGT: {landed_on} F: {flag} DMG: {dmg} SS: {some_short} OWN: {from_who} F2: {some_flag2}')
+        if landed_on != state.me.entry.id:
+            return
         state.calc_burst(dmg)
         # state.add_expected_dmg(dmg)
         # state.aoe.update({'time': time.time(), 'dmg': dmg})

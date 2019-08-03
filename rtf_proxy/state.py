@@ -27,6 +27,8 @@ class State:
         self.hp_delta = 0
         self.prev_damage = 0
         self.burst_value = 0
+        self.defence = 0
+        self.damage_diff = []
 
     async def burst(self, dmg):
         await asyncio.sleep(self.burst_time)
@@ -34,6 +36,7 @@ class State:
 
     reserve_hp = 20
     burst_time = 0.5
+    use_defence = False
 
     def calc_burst(self, dmg):
         self.prev_damage = dmg
@@ -46,7 +49,10 @@ class State:
             self.close()
 
     def add_expected_dmg(self, dmg):
-        self.expected_dmg += dmg
+        if self.use_defence:
+            self.expected_dmg += (dmg * 0.85 - self.defence) + dmg * 0.15
+        else:
+            self.expected_dmg += dmg
 
         if not self.hp_safe:
             print(f'Not safe hp {self.hp} => {self.expected_dmg}')
@@ -67,7 +73,16 @@ class State:
             old_hp = old_dct['hp']
             new_hp = new_dct.get('hp', old_hp)
             if self.expected_dmg > 0:
-                print(f'Real: {new_hp} VS Expected: {old_hp - self.expected_dmg} [{self.expected_dmg}]')
+                expected_hp = old_hp - self.expected_dmg
+
+                if self.use_defence:
+                    diff = abs(expected_hp - new_hp)
+                    if diff > 20 and expected_hp < new_hp:
+                        self.defence += 1
+                    elif diff > 20 and expected_hp > new_hp:
+                        self.defence -= 1
+
+                print(f'Real: {new_hp} VS Expected: {expected_hp} [{self.expected_dmg}] Def: {self.defence}')
             # print('Reset expected: {self.expected_dmg}')
             self.expected_dmg = 0
 

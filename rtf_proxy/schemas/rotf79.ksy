@@ -21,32 +21,14 @@ seq:
     type: entry
     repeat: expr
     repeat-expr: num_entries
-  - id: unk_dies
+  - id: num_gone_objects
     type: u2
-  - id: unk_i4
+  - id: gone_object_id
     type: u4
     repeat: expr
-    repeat-expr: unk_dies
-  - id: switch
-    type: u2
-  - id: some_int_when_03
-    if: switch == 0x3
-    type: u4
-  - id: indicator_06
-    if: switch == 0x02
-    type: u1
-  - id: value_06
-    if: switch == 0x02
-    type: u4
-  - id: value_04
-    if: switch == 0x04
-    type: u4
-  - id: magic_6300
-    type: u2
-  - id: indicator_04
-    type: u1
-  - id: magic_31293139
-    type: u4
+    repeat-expr: num_gone_objects
+  - id: end_entity
+    type: base
   - id: rest
     size-eos: true
 types:
