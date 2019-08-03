@@ -128,7 +128,7 @@ def process_bullet(state, payload):
         for i in range(owner_bullet, owner_bullet + bullets_in_shot):
             # handle short
             if i > 255:
-                i = i - 255
+                i = i - 256
             bullets[i] = dmg
         state.add_enemy(owner, pos_x, pos_y, bullets)
         # payload[pos_x:pos_x + 4] = b'\x00\x00\x00\x00'
