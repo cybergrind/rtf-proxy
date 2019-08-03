@@ -3,11 +3,17 @@ import json
 import math
 import struct
 
-from rtf_proxy.packet_tools import format_packet, print_unpack, save_packet, encode_packet
-from rtf_proxy.state import new_state
+from rtf_proxy.bullet_analysis import (
+    bullet_double,
+    outcoming_shot,
+    process_aoe_dmg,
+    process_aoe_shot,
+    process_bullet,
+    process_hit_ack,
+)
 from rtf_proxy.obj_analysis import analyze_objects, artificial_status
-from rtf_proxy.bullet_analysis import process_bullet, outcoming_shot, bullet_double
-
+from rtf_proxy.packet_tools import encode_packet, format_packet, print_unpack, save_packet
+from rtf_proxy.state import new_state
 
 VAULT_PACKET = b'\x01\x00\x05Vault\x00\x00\x00\x00\x00\x00\x08\x02\x00\x00ai'
 SAFE_LOCATIONS = [b'Nexus', b'Market', b'Vault']
@@ -29,8 +35,10 @@ async def out_loop(state, reader, writer):
         skip = False
         size = await reader.read(4)
         if len(size) == 0:
+            print('size 0')
             return
         if writer.is_closing():
+            print('wclosing')
             return
         if state.kill and not writer.is_closing():
             writer.close()
@@ -38,16 +46,19 @@ async def out_loop(state, reader, writer):
         # print(f'Out Got size: {size} => {_size_bytes}')
         payload = await reader.read(_size_bytes)
         _type = struct.unpack('!B', payload[:1])[0]
+        # 08 - aoe ack?
         # 27 - shot ack?
-        # 35 - shot landed ack?
+        # 35 - shot ack
         # 51 - position
-        # 76 - bullet is landed
+        # 76 - bullet hit
         # 82 - shot
         # 89 - shot landed in something else / wall
+        # 98 - damaged by terrain?
         # 156 - set runes
-        if _type not in (3, 27, 30, 51, 82, 84, 154):
+        if _type not in (3, 27, 30, 31, 35, 51, 76, 82, 84, 80, 89, 154):
             print(f'Out: {format_packet(payload[:100])}')
-        if _type in (35, 89):
+
+        if _type in (98,):
             save_packet(state, payload)
             # print(format_packet(payload))
 
@@ -56,28 +67,17 @@ async def out_loop(state, reader, writer):
 
         if _type == 82:
             payload = outcoming_shot(state, payload)
-            # print_unpack('!BIHBIIfI', payload)
-            # o = list(struct.unpack('!BIHBIIfI', payload))
-            # x, y, angle = o[4], o[5], o[6]
-            # x, y = mypos
-            # print(f'Mypos: {x}\t\t{y}')
-            # tx, ty = pos
-            # enemy = get_enemy()
-            # if enemy:
-            #     tx, ty = enemy['tx'], enemy['ty']
-            #     new_angle = get_angle(tx, ty)
-            #     print(f'Shot at: {enemy} Old angle: {angle} New angle: {new_angle}')
-            #     o[6] = new_angle
-            #     payload = struct.pack('!BIHBIIfI', *o)
-            # tangle = math.atan2(ty - y, tx - x)
-            # print(f'{tangle - angle} == Tangle: {tangle} Vs {angle} / {tx}:{ty} | {x}:{y}')
-            # modify = list(struct.unpack('!BIHBIIfI', payload))
-            # if modify[3] == 145:
-            #     print('modify: 145 => 155')
-            #     modify[3] = 155
-            # payload = struct.pack('!BIHBIIfI', *modify)
-            pass
-        elif _type in (35,):
+
+        if _type in (35,):
+            process_hit_ack(state, payload)
+            skip = True
+        elif _type == 8:
+            # AOE ack
+            process_aoe_dmg(state, payload)
+            skip = True
+        elif _type == 98:
+            # damaged by lava
+            process_aoe_dmg(state, payload)
             skip = True
         elif _type == 76:
             # skip = True
@@ -91,12 +91,18 @@ async def out_loop(state, reader, writer):
             state.set_mypos(out[3], out[4])
             pass
         state.count_packet(payload)
-        state.log.write(f'Outgoing [{state.counter}]: Size: {_size_bytes} Payload: {format_packet(payload)}\n\n')
+        state.log_write(
+            f'Outgoing [{state.counter}]: Size: {_size_bytes} Payload: {format_packet(payload)}\n\n'
+        )
         if not skip:
+            if state.kill and not writer.is_closing():
+                writer.close()
+                print('out => return close')
+                return
             writer.write(size)
             writer.write(payload)
         else:
-            print('Skip packet...')
+            print(f'OUT Skip packet... {_type}')
 
 
 async def in_loop(state, reader, writer):
@@ -105,6 +111,7 @@ async def in_loop(state, reader, writer):
         skip = False
         size = await reader.read(4)
         if len(size) == 0:
+            print('isize 0')
             return
 
         if writer.is_closing():
@@ -121,13 +128,15 @@ async def in_loop(state, reader, writer):
             payload += await reader.read(remain)
         _type = struct.unpack('!B', payload[:1])[0]
         # 23 - message
-        # 35 - ping ack?
+        # 36 - terrain damage notify?
         # 40 - AOE?
         # 75 - enemy shots?
         # 79 - map update
         # 85 - object move?
+        # 91 - death note
+        # 98 ???
         # 159 - change realm?
-        if _type not in (9, 21, 22, 26, 23, 27, 75, 78, 79, 82, 83, 85, 87, 93, 155):
+        if _type not in (9, 21, 22, 26, 23, 27, 36, 75, 78, 79, 82, 83, 85, 87, 93, 155):
             print(f'In: {format_packet(payload[:100])}')
 
         if _type in (1,):
@@ -138,7 +147,7 @@ async def in_loop(state, reader, writer):
                 state.safe = False
             print(f'Location to: {state.safe}')
 
-        if _type in (None,):
+        if _type in (None, 75):
             save_packet(state, payload)
 
         # if b'\x00\x00\x03\xdb' in payload:
@@ -157,6 +166,11 @@ async def in_loop(state, reader, writer):
             # unp75(payload)
             # save_packet(state, payload)
             pass
+        elif _type == 40:
+            # AOE shot
+            process_aoe_shot(state, payload)
+        elif _type == 36:
+            process_aoe_dmg(state, payload)
         elif _type == 78:
             # save_packet(state, payload)
             pass
@@ -170,20 +184,23 @@ async def in_loop(state, reader, writer):
                 # payload.replace(b'\x00\x08\x00\x00#g', b'\x00\x08\x00\x00#h')
                 # payload.replace(b'\x06110601|\x00\x00\x00$', b'\x06110601|\x00\x00\x00\x88')
                 pass
-        if not state.safe and (state.hp_level < 0.5 and state.hp < 600):
-            print(f'Critical level: {state.hp_level}')
-            goto_vault()
+        if not state.hp_safe:
+            state.close()
         # print(f'Got payload: {payload}')
         state.count_packet(payload)
-        state.log.write(
+        state.log_write(
             f'Incoming [{state.counter}]: Size: {_size_bytes}/{len(payload)}/{size} '
             f'Payload: {format_packet(payload)}\n\n'
         )
         if not skip:
+            if state.kill and not writer.is_closing():
+                writer.close()
+                print('in return close')
+                return
             writer.write(size)
             writer.write(payload)
         else:
-            print('Skip package')
+            print(f'IN Skip packet {_type}')
 
 
 async def handle_incoming(local_reader, local_writer):
@@ -195,15 +212,18 @@ async def handle_incoming(local_reader, local_writer):
     out_writer = remote_writer
     try:
         ret = await asyncio.wait(
-            [out_loop(state, local_reader, remote_writer), in_loop(state, remote_reader, local_writer)],
+            [
+                out_loop(state, local_reader, remote_writer),
+                in_loop(state, remote_reader, local_writer),
+            ],
             return_when=asyncio.FIRST_EXCEPTION,
         )
         print(f'Ret: {ret}')
     except Exception as e:
         print(f'Got Exc: {e}')
     finally:
-        state.close()
         print('Close all')
+        state.close()
         local_writer.close()
         remote_writer.close()
 

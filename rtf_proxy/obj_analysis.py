@@ -134,9 +134,9 @@ class GameObject:
             dct_key, dct_value = self.mapping.get(key, (hex(key), 'value'))
             self.dct[dct_key] = getattr(kv.value, dct_value)
         if self.entry.id in self.state.enemies and hasattr(self.entry, 'pos_x'):
-            self.state.add_enemy(self.entry.id, self.entry.pos_x, self.entry.pos_y)
+            self.state.add_enemy(self.entry.id, self.entry.pos_x, self.entry.pos_y, {})
         if self.dct.get('name') == 'cybergrind':
-            self.state.me = self
+            self.state.set_new_me(self)
             if hasattr(self.entry, 'x_pos'):
                 self.state.set_mypos(self.entry.x_pos, self.entry.y_pos)
 
@@ -153,7 +153,7 @@ Ptype: 85 => {'0x8': 2320, '0x9': 22351, '0xa': 2512, '0xb': 2985, 'max_hp': 863
 
         """
         if self.state.me and self.state.me.entry.id == self.entry.id:
-            self.state.me.dct.update(self.dct)
+            self.state.update_me_dct(self.dct)
             _type = struct.unpack('!B', self.payload[:1])[0]
             if len(self.dct) > 1:
                 print(f'Ptype: {_type} => {self.dct}')
