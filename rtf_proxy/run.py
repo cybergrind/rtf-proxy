@@ -12,6 +12,7 @@ from rtf_proxy.bullet_analysis import (
     process_hit_ack,
 )
 from rtf_proxy.obj_analysis import analyze_objects, artificial_status
+from rtf_proxy.const import AUTOUSE, SKILL
 from rtf_proxy.packet_tools import encode_packet, format_packet, print_unpack, save_packet
 from rtf_proxy.state import new_state
 
@@ -33,7 +34,8 @@ async def out_loop(state, reader, writer):
     # asyncio.create_task(deferred_vault(writer))
     while True:
         skip = False
-        size = await reader.read(4)
+        after = []
+        size = await reader.readexactly(4)
         if len(size) == 0:
             print('size 0')
             return
@@ -42,9 +44,15 @@ async def out_loop(state, reader, writer):
             return
         if state.kill and not writer.is_closing():
             writer.close()
+
+        while state.to_send:
+            msg = state.to_send.pop()
+            print(f'Send extra msg: {msg}')
+            writer.write(msg)
+
         _size_bytes = struct.unpack('!I', size)[0] - 4
         # print(f'Out Got size: {size} => {_size_bytes}')
-        payload = await reader.read(_size_bytes)
+        payload = await reader.readexactly(_size_bytes)
         _type = struct.unpack('!B', payload[:1])[0]
         # 08 - aoe ack?
         # 27 - shot ack?
@@ -52,6 +60,7 @@ async def out_loop(state, reader, writer):
         # 51 - position
         # 76 - bullet hit
         # 82 - shot
+        # 84 - outcoming messages
         # 89 - shot landed in something else / wall
         # 98 - damaged by terrain?
         # 156 - set runes
@@ -68,7 +77,7 @@ async def out_loop(state, reader, writer):
         if _type not in (3, 27, 30, 31, 35, 51, 76, 82, 84, 80, 89, 154):
             print(f'Out: {format_packet(payload[:100])}')
 
-        if _type in (49, 59, 102) and False:
+        if _type in (49, 59, 102, 51):
             save_packet(state, payload)
             # print(format_packet(payload))
 
@@ -85,6 +94,32 @@ async def out_loop(state, reader, writer):
             # AOE ack
             process_aoe_dmg(state, payload)
             skip = True
+        elif _type == 49:
+            # interaction
+            out = list(struct.unpack('!BIIBIIIB', payload))
+            # print(f'State TS: {state.ts} VS {out[1]} == {state.ts - out[1]}')
+            idx = out[3]
+            item_id = out[4]
+            if item_id in SKILL:
+                pass
+            elif item_id not in AUTOUSE:
+                print(f'Interact with: {hex(item_id)} IN {idx}')
+            state.prev_49 = out[1]
+            out[1] = state.gen_ts()
+            payload = struct.pack('!BIIBIIIB', *out)
+            if state.to_interact and False:
+                ts = state.gen_ts()
+                out = state.to_interact.pop()
+                out[1] = ts
+                payload = struct.pack('!BIIBIIIB', *out)
+                msg = f'!!! Run Interaction: {out}'
+                print(msg)
+                state.log_write(msg)
+            # payload = bytearray(payload)
+            # out = list(struct.unpack('!BIIBIIIB', payload))
+            # ts = state.gen_ts()
+            # out[1] = ts
+            # payload = struct.pack('!BIIBIIIB', *out)
         elif _type == 98:
             # damaged by lava
             process_aoe_dmg(state, payload)
@@ -94,15 +129,30 @@ async def out_loop(state, reader, writer):
             # payload = bullet_double(payload)
             if not payload:
                 skip = True
-        elif _type == 51 and _size_bytes == 17:
+        elif _type == 51:
             # print(format_packet(payload))
             # print_unpack('!BIIII', payload)
-            out = struct.unpack('!BIIII', payload)
+            out = list(struct.unpack('!BIIII', payload))
+            packet_id = out[1]
+            ts = out[2]
             state.set_mypos(out[3], out[4])
-            pass
+            new = state.set_ts(packet_id, ts)
+            if new:
+                out[2] = new
+                print('Repack...')
+            if state.scheduled:
+                print(f'Packet: {packet_id} Scheduled: {state.scheduled}')
+            payload = struct.pack('!BIIII', *out)
+            if packet_id in state.scheduled:
+                after = state.scheduled.pop(packet_id)
+
+            for scheduled in after:
+                state.log_write('Run scheduled...', stdout=True)
+                scheduled()
+
         state.count_packet(payload)
         state.log_write(
-            f'Outgoing [{state.counter}]: Size: {_size_bytes} Payload: {format_packet(payload)}\n\n'
+            f'Outgoing [{state.counter}]: Size: {_size_bytes} [{size}] Payload: {format_packet(payload)}\n\n'
         )
         if not skip:
             if state.kill and not writer.is_closing():
@@ -119,10 +169,10 @@ async def in_loop(state, reader, writer):
     # asyncio.create_task(artificial_status(state, writer))
     while True:
         skip = False
-        size = await reader.read(4)
+        size = await reader.readexactly(4)
         if len(size) == 0:
             print('isize 0')
-            return
+            continue
 
         if writer.is_closing():
             return
@@ -131,7 +181,7 @@ async def in_loop(state, reader, writer):
 
         _size_bytes = struct.unpack('!I', size)[0] - 4
         # print(f'In Got size: {size} => {_size_bytes}')
-        payload = await reader.read(_size_bytes)
+        payload = await reader.readexactly(_size_bytes)
         while len(payload) < _size_bytes:
             remain = _size_bytes - len(payload)
             # print(f'Waiting for more: {remain} => {payload}')
@@ -156,8 +206,10 @@ async def in_loop(state, reader, writer):
             else:
                 state.safe = False
             print(f'Location to: {state.safe}')
+        elif _type == 159:
+            state.on_teleport(payload)
 
-        if _type in (None, 36):
+        if _type in (None, 79, 85):
             save_packet(state, payload)
 
         # if b'\x00\x00\x03\xdb' in payload:
@@ -220,6 +272,8 @@ async def handle_incoming(local_reader, local_writer):
     state = new_state()
     global out_writer
     out_writer = remote_writer
+    state.remote_writer = remote_writer
+    state.local_writer = local_writer
     try:
         ret = await asyncio.wait(
             [

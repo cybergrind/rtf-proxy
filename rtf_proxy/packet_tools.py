@@ -25,5 +25,11 @@ def encode_packet(packet):
     return struct.pack('!I', len(packet)) + packet
 
 
-with open('sample_36_no_burst1.bin', 'wb') as f:
-    f.write(b'$\x00\x04g\t\x00\x00\x17\x00\x00\xff\xff\xff\xff\x00')
+def payload_to_packet(payload):
+    return struct.pack('!I', len(payload) + 4) + payload
+
+
+with open('sample_59_fpanel.bin', 'wb') as f:
+    f.write( b';\x008\xee\xb1B\xa5\x00\x00B\xcd\x00\x00\x00\x00\x02p\x00\x00\x00\n!\x00\x00\x02o\x0b\xff\xff\xff\xff')
+
+

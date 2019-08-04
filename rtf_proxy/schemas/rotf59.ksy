@@ -7,7 +7,7 @@ meta:
 seq:
   - id: p_type
     type: u1
-  - id: unk
+  - id: ts
     type: u4
   - id: pos_x
     type: u4
@@ -15,13 +15,13 @@ seq:
     type: u4
   - id: inv_id
     type: u4
-  - id: indicator_00
+  - id: idx
     type: u1
   - id: item
     type: u4
   - id: who_pickup
     type: u4
-  - id: indicator_04
+  - id: target_slot
     type: u1
   - id: magic_ffff
     type: u4

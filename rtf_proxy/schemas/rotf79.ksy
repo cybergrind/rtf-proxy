@@ -23,7 +23,7 @@ seq:
     repeat-expr: num_entries
   - id: num_gone_objects
     type: u2
-  - id: gone_object_id
+  - id: gone_object_ids
     type: u4
     repeat: expr
     repeat-expr: num_gone_objects
@@ -42,7 +42,7 @@ types:
         type: u2
   entry:
     seq:
-      - id: some_short
+      - id: obj_type
         type: u2
       - id: id
         type: u4

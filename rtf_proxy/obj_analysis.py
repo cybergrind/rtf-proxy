@@ -1,10 +1,9 @@
 import asyncio
 import glob
 import struct
-from enum import Flag, auto
-from itertools import chain
 
-from rtf_proxy.packet_tools import save_packet
+from rtf_proxy.const import AUTOUSE, ITEM, MAPPING, SLOTS, STATUS
+from rtf_proxy.packet_tools import payload_to_packet, save_packet
 from rtf_proxy.state import new_state
 from rtf_proxy.structs.rotf79 import Rotf79
 from rtf_proxy.structs.rotf85 import Rotf85
@@ -14,67 +13,7 @@ unpackers = {79: Rotf79, 85: Rotf85}
 look_name = 'cybergind'
 
 
-class STATUS(Flag):
-    B1 = auto()
-    SILENT = auto()
-    B3 = auto()
-    SLOW = auto()
-    B5 = auto()  # skull
-    SLOW_ATTACK = auto()
-    STAR = auto()  # NO ATTACK
-    BLIND = auto()
-    HALLUCINATING = auto()
-    DRUNK = auto()
-    CONFUSED = auto()
-    B12 = auto()
-    INVISIBLE = auto()
-    PARALYZED = auto()
-    SPEEDY = auto()
-    BLEEDING = auto()
-    B17 = auto()
-    HEALING = auto()
-    DAMAGING = auto()
-    BERSERK = auto()
-    DISABLED = auto()  # GRAY
-    BLACK_WHITE = auto()
-    B23 = auto()
-    B24 = auto()
-    INVULN = auto()
-    BROWN_ARMOR = auto()
-    CROSS = auto()
-    IM_PET = auto()
-    SPEEDY2 = auto()
-    UNSTABLE = auto()
-    DARKNESS = auto()
-    B32 = auto()
-
-
-MAPPING = {
-    0x00: ('max_hp', 'value'),
-    0x01: ('hp', 'value'),
-    0x03: ('max_mp', 'value'),
-    0x04: ('mp', 'value'),
-    0x0c: ('slot_1', 'value'),
-    0x0d: ('slot_2', 'value'),
-    0x0e: ('slot_3', 'value'),
-    0x0f: ('slot_4', 'value'),
-    0x10: ('slot_5', 'value'),
-    0x11: ('slot_6', 'value'),
-    0x12: ('slot_7', 'value'),
-    0x13: ('slot_8', 'value'),
-    0x14: ('ATT', 'value'),
-    0x15: ('DEF', 'value'),
-    0x16: ('SPD', 'value'),
-    0x1a: ('VIT', 'value'),
-    0x1b: ('WIS', 'value'),
-    0x1c: ('DEX', 'value'),
-    0x1d: ('status', 'value'),
-    0x1f: ('name', 'name'),
-    0x26: ('0x26', 'name'),
-    0x36: ('0x36', 'name'),
-    0x3e: ('clan', 'name'),
-    0x63: ('0x63', 'name'),
-}
+I = ITEM
 
 
 class GameObject:
@@ -144,16 +83,72 @@ class GameObject:
     def decode_object(self, obj):
         if obj.num_fields == 0:
             return
-        for kv in obj.dct:
-            key = kv.key
-            dct_key, dct_value = MAPPING.get(key, (hex(key), 'value'))
-            self.dct[dct_key] = getattr(kv.value, dct_value)
+        self.dct = decode_object(obj)
         if self.entry.id in self.state.enemies and hasattr(self.entry, 'pos_x'):
             self.state.add_enemy(self.entry.id, self.entry.pos_x, self.entry.pos_y, {})
-        if self.dct.get('name') == 'cybergrind':
+
+        name = self.dct.get('name')
+        if name and name.endswith('/8'):
+            # 533f => potion crate
+            # 0a34 => vitality
+            # 0a20 => def
+            idx = 0
+            for i in range(0x8, 0x10):
+                continue
+                if i in MAPPING:
+                    name = MAPPING[i][0]
+                else:
+                    name = hex(i)
+                item = self.dct[name]
+                if item in AUTOUSE:
+                    out_type = 49
+                    ts = self.state.gen_ts() + idx
+                    if ts == self.state.ts:
+                        ts += 1
+                    _id = self.entry.id
+                    i1 = 0
+                    i2 = 0
+                    b1 = 1
+                    pl = struct.pack('!BIIBIIIB', out_type, ts, _id, idx, item, i1, i2, b1)
+                    what = payload_to_packet(pl)
+                    self.state.ts_ensure_bigger = ts
+                    assert len(what) == 23 + 4
+                    # self.state.to_interact.append([out_type, ts, _id, idx, item, i1, i2, b1])
+                    msg = f'!!Autoopen: {what}   TS: {self.state.ts} Gen: {ts} : {idx} && {i}\n'
+                    print(msg)
+                    # self.state.log_write(msg)
+                    # self.state.to_send.append(what)
+                    # self.state.remote_writer.write(what)
+
+                    def _run():
+                        ts = self.state.gen_ts()
+                        while ts - self.state.ts < 30:
+                            ts = self.state.gen_ts()
+                        pl = struct.pack('!BIIBIIIB', out_type, ts, _id, idx, item, i1, i2, b1)
+                        what = payload_to_packet(pl)
+                        self.state.log_write(f'Write to remote writer: {what}\n')
+                        self.state.remote_writer.write(what)
+                        print(f'State TS: {self.state.ts} VS {ts} == {self.state.ts - ts}')
+                        self.state.prev_49 = ts
+
+                    # self.state.schedule(_run)
+                idx += 1
+            # self.state.add_bag(self)
+            if not hasattr(self.entry, 'obj_type'):
+                pass
+            else:
+                self.state.add_bag(self)
+                print(
+                    f'Got bag entry: {self.dct} => Type: {hex(self.entry.obj_type)} {bin(self.entry.obj_type)} EID: {self.entry.id}'
+                )
+
+        if name == 'cybergrind':
             self.state.set_new_me(self)
             if hasattr(self.entry, 'x_pos'):
                 self.state.set_mypos(self.entry.x_pos, self.entry.y_pos)
+
+        if self.entry.id in self.state.bags:
+            self.state.add_bag(self)
 
         if self.state.me and self.state.me.entry.id == self.entry.id:
             self.state.update_me_dct(self.dct)
@@ -184,16 +179,27 @@ async def artificial_status(state, writer):
         writer.write(pl)
 
 
+class MyDict(dict):
+    def update(self, what):
+        super().update(what)
+        self.raw.update(what.raw)
+
+
 def decode_object(obj):
-    dct = {}
+    dct = MyDict()
+    dct.raw = {}
     if obj.num_fields == 0:
         return dct
     for kv in obj.dct:
         key = kv.key
         dct_key, dct_value = MAPPING.get(key, (hex(key), 'value'))
-        dct[dct_key] = getattr(kv.value, dct_value)
+        value = raw_value = getattr(kv.value, dct_value)
+        if dct_key in SLOTS:
+            value = ITEM.get(raw_value)
+        dct[dct_key] = value
         if dct[dct_key] == 0xffffffff:
             dct[dct_key] = 'empty'
+        dct.raw[key] = raw_value
     return dct
 
 
@@ -216,6 +222,12 @@ def handle_my_stats(payload, dct):
     return payload
 
 
+def handle_my_inventory(payload, dct):
+    if 'slot_1' not in dct:
+        return payload
+    return payload
+
+
 def analyze_objects(state, payload):
     payload = bytearray(payload)
     _type = struct.unpack('!B', payload[:1])[0]
@@ -226,14 +238,33 @@ def analyze_objects(state, payload):
         return bytes(payload)
     # print('ok packet')
     if hasattr(obj, 'ts'):
-        state.ts = obj.ts
+        state.__ts = obj.ts
     if obj.num_entries > 0:
         for entry in obj.entries:
             GameObject(state, entry, payload)
     if hasattr(obj, 'end_entity'):
         other_dct = decode_object(obj.end_entity)
         if other_dct:
+            state.update_me_dct(other_dct)
             payload = handle_my_stats(payload, other_dct)
+            payload = handle_my_inventory(payload, other_dct)
+    if _type == 79:
+        # 0503 => violet bag
+        # 0504 => small chest in vault
+        # 0505 => purchase chest
+        # 0506 => pink bag
+        # 0507 => violet bag
+        # 0508 => basket
+        # 0509 => potion bag (light blue)
+        # 050b => blue bag
+        # 050e => yellow bag
+        # 0523 => regular bag
+        # 06db => blue big
+        if obj.gone_object_ids:
+            state.remove_entities(obj.gone_object_ids)
+        if b'0/8' in payload:
+            print(f'Replace => 0/8 => 8/8: ME: {state.me.entry.id}')
+            # payload = payload.replace(b'\x05\x03', b'\x78\x08')
     return bytes(payload)
 
 
