@@ -34,8 +34,9 @@ class State:
         await asyncio.sleep(self.burst_time)
         self.burst_value = max(0, self.burst_value - dmg)
 
-    reserve_hp = 20
+    reserve_hp = 50
     burst_time = 0.5
+    burst_amount = 1
     use_defence = False
 
     def calc_burst(self, dmg):
@@ -44,7 +45,7 @@ class State:
         print(f'Received damage: {dmg} [Burst: {self.burst_value}]')
         if not self.is_test:
             asyncio.create_task(self.burst(dmg))
-        if (self.hp - self.reserve_hp) < self.burst_value + dmg:
+        if (self.hp - self.reserve_hp) < self.burst_value + dmg * self.burst_amount:
             print(f'Close due burst: {self.burst_value} + {dmg} VS {self.hp}')
             self.close()
 

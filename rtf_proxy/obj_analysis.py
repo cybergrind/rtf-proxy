@@ -211,12 +211,8 @@ def handle_my_stats(payload, dct):
         idx = payload.find(old, struct_idx)
         payload[idx : idx + 5] = new
 
-    count = 40
     replace(0x16, 'SPD', 75)
-    for i in chain([0x1c]):
-        count += 1
-        name = MAPPING[i][0]
-        replace(i, name, 180)
+    replace(0x1c, 'DEX', dct['DEX'] + 25)
     return payload
 
 
