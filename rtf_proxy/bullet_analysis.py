@@ -160,7 +160,8 @@ def process_hit_ack(state, payload):
         # key = next(filter(lambda i: i < bullet_id, variants))
         # bullet_dmg = enemy['bullets'][key]
         print(f'Cannot find bullet: {bullet_id} in {enemy}. Use: {payload}')
-        raise Exception('no bullet')
+        bullet_dmg = 300  # no bullet dmg
+        # raise Exception('no bullet')
     else:
         bullet_dmg = enemy['bullets'][bullet_id]
     state.add_expected_dmg(bullet_dmg)

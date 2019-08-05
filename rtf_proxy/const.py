@@ -45,6 +45,10 @@ MAPPING = {
     0x01: ('hp', 'value'),
     0x03: ('max_mp', 'value'),
     0x04: ('mp', 'value'),
+    0x08: ('item_1', 'value'),
+    0x09: ('item_2', 'value'),
+    0x0a: ('item_3', 'value'),
+    0x0b: ('item_4', 'value'),
     0x0c: ('slot_1', 'value'),
     0x0d: ('slot_2', 'value'),
     0x0e: ('slot_3', 'value'),
@@ -97,6 +101,14 @@ class ITEM(IntEnum):
     MANA = 0xaea
     SKULL_TORMENT = 2321
     SKULL_CHOCO = 22154
+    ATT_2X = 9064
+    HP_2X = 9070
+    VIT_2X = 9067
+    MYST_COIN = 22066
+    INC_RING = 23020  # imm to flame
+    STAFF_T14 = 2320
+    ROBE_INCUMB_F5 = 21774
+
     SPECIAL_CRATE = 21309
     ITEM_CRATE = 21310
     POTION_CRATE = 21311
@@ -290,14 +302,12 @@ class ITEM(IntEnum):
     WAND_T4 = 2673
     LARMOR_T3 = 2681
     SCEPTER_T1 = 2862
-    MYST_COIN = 22066
     KAT_T2 = 3142
     HELMET_T2 = 2664
     FLAME_SEEDS = 23019
     TRAP_T5 = 2742
     HP_T6 = 2985
     DEX_2X = 9069
-    INC_RING = 23020  # imm to flame
     SWORD_UT_ICE_F3 = 5846
     ROBE_T11 = 2709
     KAT_T4 = 3144
@@ -310,6 +320,18 @@ class ITEM(IntEnum):
     SWORD_T6 = 2620
     ARMOR_T6 = 2577
     STAFF_T0 = 2711
+    KAT_T3 = 3143
+    STAFF_T10 = 2721
+    LARMOR_T2 = 2573
+    ROBE_T12 = 2710
+    QUIVER_T5 = 2661
+    ARMOR_T7 = 2783
+    LARMOR_T7 = 2770
+    ROBE_ST_TOGA_F5 = 2526
+    PRISM_5 = 2848
+    CLOAK_T1 = 2647
+    VIT_T5 = 2762
+    KAT_T13 = 586
 
     @staticmethod
     def get(value):
@@ -322,13 +344,16 @@ I = ITEM
 SKILL = [I.SKULL_CHOCO, I.SKULL_TORMENT]
 LOOT = [I.ATT, I.DEX]
 AUTOUSE = [I.POTION_CRATE, I.ITEM_CRATE, I.VIT, I.WIS, I.DEF, I.GREEN_CRATE, I.MANA_POTION,
+           I.VIT_2X,
            I.SPD,
            I.ATT, I.DEX,  # comment for loot
            I.HP_POTION, I.ALCHEM, I.MAGN_RECEIPT, I.ANT_POTION, I.RIGGED_ALCHEMIST, I.MYST_COIN,
            I.FUEL_PUMP, I.FUEL_CART]
 AUTOPICKUP = [I.SPD, I.ATT, I.MANA, I.HP, I.DEX, I.SPECIAL_CRATE, I.SKULL_CHOCO, I.SKULL_TORMENT,
               I.BACKPACK, I.CHEST_UNLOCKER, I.QUEST_CHEST, I.ECOIN1,
-              I.HP_T6, I.DEX_2X, I.INC_RING]
+              I.HP_T6, I.DEX_2X, I.HP_2X, I.ATT_2X, I.INC_RING,
+              I.STAFF_T14, I.ROBE_INCUMB_F5,
+              ]
 AUTOUSE_ON_FULL = [I.SPD, I.ATT, I.MANA, I.HP, I.DEX]
 WARN = []
 IMPORTANT = [I.FLAME_IN_BOTTLE, I.SKULL_CHOCO, I.SPECIAL_CRATE, I.GREEN_CRATE, I.HP_T6]
