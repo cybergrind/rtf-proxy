@@ -1,13 +1,16 @@
 import asyncio
-import time
-import json
 import io
+import json
 import math
 import struct
-from collections import defaultdict
-from packet_tools import payload_to_packet
-from rtf_proxy.const import MAPPING, AUTOUSE, AUTOPICKUP, SLOTS, AUTOUSE_ON_FULL, ITEM
+import time
+import importlib
 
+from collections import defaultdict
+
+from packet_tools import payload_to_packet
+import rtf_proxy.const
+from rtf_proxy import const
 
 TOLERATE = 20  # AOE memory
 
@@ -18,6 +21,7 @@ class State:
         self.stats = defaultdict(int)
         self.mypos = [0, 0]
         self.me = None
+        self.location = b'Nexus'
         self.safe = True
         self.kill = False
         self.enemies = {}
@@ -34,16 +38,15 @@ class State:
         self.ts = 0
         self.ts_ensure_bigger = -1
         self.last_ts = 0
-        self.to_interact = []
         self.to_send = []
         self.scheduled = {}
         self.prev_49 = None
         self.bags = {}
+        self.loot = 0
 
     async def burst(self, dmg):
         await asyncio.sleep(self.burst_time)
         self.burst_value = max(0, self.burst_value - dmg)
-
 
     bag_live = 60
 
@@ -62,23 +65,69 @@ class State:
             del self.bags[_id]
 
     def after_bag_update(self, bag):
-        print(f'AFTER BAG UPDATE: {bag.dct}')
         for i in range(0x8, 0x10):
-            if i in MAPPING:
-                name = MAPPING[i][0]
+            if i in const.MAPPING:
+                name = const.MAPPING[i][0]
             else:
                 name = hex(i)
-            item = ITEM.get(bag.dct[name])
+            item = const.ITEM.get(bag.dct[name])
+            if item in const.WARN and self.get_free_slot():
+                self.warn_message(f'Cannot pickup item: {item} CHECK IT'.encode('utf8'))
+        if self.location in const.NO_PICKUP:
+            return
+        print(f'AFTER BAG UPDATE: {bag.dct}')
+        for i in range(0x8, 0x10):
+            if i in const.MAPPING:
+                name = const.MAPPING[i][0]
+            else:
+                name = hex(i)
+            item = const.ITEM.get(bag.dct[name])
             if item == 'empty':
                 continue
             print(f'ITEM: {item}')
-            if item in AUTOUSE:
-                self.use_bag_item(bag, i)
-            elif item in AUTOPICKUP and self.get_free_slot():
+            has_slot = self.get_free_slot()
+            if self.loot > 0 and item in const.LOOT and has_slot:
                 self.move_to_slot(bag.entry.id, item)
-            elif item in AUTOUSE_ON_FULL:
+                self.loot -= 1
+                state.warn_message(f'Loot {self.loot} more')
+            elif item in const.AUTOUSE:
+                self.use_bag_item(bag, i)
+            elif item in const.AUTOPICKUP and has_slot:
+                self.move_to_slot(bag.entry.id, item)
+            elif item in const.AUTOUSE_ON_FULL:
                 print(f'=======> Autouse because full: {self.me.dct}')
                 self.use_bag_item(bag, i)
+            elif item in const.IMPORTANT:
+                self.warn_message(f'Got important item, PICKUP IT: {item}')
+            elif not isinstance(item, const.ITEM):
+                self.warn_message(f'Get and process item: {item}')
+                if self.get_free_slot():
+                    self.move_to_slot(bag.entry.id, item)
+            else:
+                pass
+
+    def handle_cmd(self, payload):
+        skip = False
+        _size = struct.unpack('!H', payload[1:3])[0]
+        bin_send_msg = payload[3:3 +_size]
+        command = bin_send_msg.decode('utf8')
+        try:
+            if command == 'creload':
+                skip = True
+                importlib.reload(rtf_proxy.const)
+                state.warn_message('Reloaded...')
+            elif command.startswith('cloot'):
+                skip = True
+                maybe_int = command.replace('cloot', '').strip()
+                if maybe_int:
+                    num = int(maybe_int)
+                else:
+                    num = 8
+                state.loot = num
+                state.warn_message(f'Set loot to: {num}')
+        except Exception as e:
+            state.warn_message(f'Command exception: {e}')
+        return skip
 
     def add_bag(self, bag):
         _id = bag.entry.id
@@ -90,8 +139,7 @@ class State:
             self.bags[_id].dct.update(bag.dct)
         self.after_bag_update(self.bags[_id])
 
-
-    reserve_hp = 50
+    reserve_hp = 75
     burst_time = 0.5
     burst_amount = 1
     use_defence = False
@@ -183,7 +231,9 @@ class State:
                     elif diff > 20 and expected_hp > new_hp:
                         self.defence -= 1
 
-                print(f'Real: {new_hp} VS Expected: {expected_hp} [{self.expected_dmg}] Def: {self.defence}')
+                print(
+                    f'Real: {new_hp} VS Expected: {expected_hp} [{self.expected_dmg}] Def: {self.defence}'
+                )
             # print('Reset expected: {self.expected_dmg}')
             self.expected_dmg = 0
 
@@ -233,8 +283,15 @@ class State:
             if not self.is_test:
                 asyncio.create_task(self.clear_enemy(enemy_id))
             self.enemies[enemy_id] = {}
-        self.enemies[enemy_id].update({'pos_x': pos_x, 'pos_y': pos_y, 'updated': time.time(),
-                                       'dist': self.dist(pos_x, pos_y), 'id': enemy_id})
+        self.enemies[enemy_id].update(
+            {
+                'pos_x': pos_x,
+                'pos_y': pos_y,
+                'updated': time.time(),
+                'dist': self.dist(pos_x, pos_y),
+                'id': enemy_id,
+            }
+        )
         self.enemies[enemy_id].setdefault('bullets', {}).update(bullets)
 
     def aim_closest(self):
@@ -308,14 +365,13 @@ class State:
         raise Exception(f'No {item_id} in {bag.dct.raw}')
 
     def get_free_slot(self):
-        for s, idx in reversed(SLOTS):
+        for s, idx in reversed(const.SLOTS):
             if s in self.me.dct.raw:
                 item = self.me.dct.raw[s]
                 if item == 0xffffffff:
-                    return idx
+                    return s, idx
 
     def move_to_slot(self, inv_id, item_id, to_slot=None, from_slot=None):
-        print(f'MOVE TO SLOT: {item_id}')
         _type = 59
         ts = self.gen_ts()
         pos_x, pos_y = self.mypos
@@ -325,14 +381,27 @@ class State:
         item_id = item_id
         who_pickup = self.me.entry.id
         if not to_slot:
-            to_slot = self.get_free_slot()
+            slot, to_slot = self.get_free_slot()
+        print(f'MOVE {item_id} TO SLOT: {to_slot} From: {from_slot} [obj: {inv_id}]')
         if not to_slot:
             print(f'CANNOT MOVE TO SLOT. NO SLOTS: {item_id}')
             return
         ffff = 0xffffffff
-        payload = struct.pack('!BIIIIBIIBI', _type, ts, pos_x, pos_y, inv_id, from_slot,
-                              item_id, who_pickup, to_slot, ffff)
+        payload = struct.pack(
+            '!BIIIIBIIBI',
+            _type,
+            ts,
+            pos_x,
+            pos_y,
+            inv_id,
+            from_slot,
+            item_id,
+            who_pickup,
+            to_slot,
+            ffff,
+        )
         print(f'Move write: {payload}')
+        self.me.dct.raw[slot] = '<moving>'
         self.remote_writer.write(payload_to_packet(payload))
 
     bag_indexes = {0x8: 0, 0x9: 1, 0xa: 2, 0xb: 3, 0xc: 4, 0xd: 5, 0xe: 6, 0xf: 7}
@@ -352,12 +421,38 @@ class State:
         what = payload_to_packet(pl)
         self.ts_ensure_bigger = ts
         assert len(what) == 23 + 4
-        # self.state.to_interact.append([out_type, ts, _id, idx, item, i1, i2, b1])
         msg = f'!!Autoopen: {what}   TS: {self.ts} Gen: {ts} : {idx} && {slot_id}\n'
         print(msg)
         # self.state.log_write(msg)
         # self.state.to_send.append(what)
         self.remote_writer.write(what)
+
+    def warn_message(self, msg):
+        # return
+        _from = b'Toool'
+        if isinstance(msg, str):
+            msg = msg.encode('utf8')
+        # r, g, b = 81, 245, 66 # green
+        r, g, b = 255, 66, 245
+        payload = struct.pack(
+            f'!BH{len(_from)}sBBBBIIBHH{len(msg)}sH{len(msg)}s',
+            23,
+            len(_from),
+            _from,
+            0x00,
+            r,
+            g,
+            b,
+            self.me.entry.id,
+            0xffffffff,  # 0x46,
+            0x5,
+            0,
+            len(msg),
+            msg,
+            len(msg),
+            msg,
+        )
+        self.local_writer.write(payload_to_packet(payload))
 
 
 # use inplace get_state when need to get to prevent caching an old state object

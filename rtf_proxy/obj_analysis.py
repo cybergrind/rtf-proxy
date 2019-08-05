@@ -2,8 +2,9 @@ import asyncio
 import glob
 import struct
 
-from rtf_proxy.const import AUTOUSE, ITEM, MAPPING, SLOTS, STATUS
-from rtf_proxy.packet_tools import payload_to_packet, save_packet
+from rtf_proxy import const
+from rtf_proxy.const import STATUS
+from rtf_proxy.packet_tools import save_packet
 from rtf_proxy.state import new_state
 from rtf_proxy.structs.rotf79 import Rotf79
 from rtf_proxy.structs.rotf85 import Rotf85
@@ -11,9 +12,6 @@ from rtf_proxy.structs.rotf85 import Rotf85
 unpackers = {79: Rotf79, 85: Rotf85}
 
 look_name = 'cybergind'
-
-
-I = ITEM
 
 
 class GameObject:
@@ -40,7 +38,10 @@ class GameObject:
         | STATUS.UNSTABLE
         | STATUS.DARKNESS
     )
-    set_flags = STATUS.DAMAGING | STATUS.SPEEDY | STATUS.BERSERK | STATUS.SPEEDY2
+    set_flags = (STATUS.DAMAGING
+                 | STATUS.SPEEDY
+                 | STATUS.BERSERK
+                 | STATUS.SPEEDY2)
 
     @property
     def position(self):
@@ -66,16 +67,16 @@ class GameObject:
 
     def reset_effects(self):
         if not hasattr(self.entry, 'x_pos'):
-            print(f'No pos effect: {STATUS(self.dct["status"])}')
+            # print(f'No pos effect: {STATUS(self.dct["status"])}')
             return
-        print(f'{STATUS(self.dct["status"])}')
+        # print(f'{STATUS(self.dct["status"])}')
         spack = struct.pack('!BI', 0x1d, self.dct['status'])
         self.flags_position = self.payload.find(spack, self.position)
         status = STATUS(self.dct['status'])
         new_status = ((status & self.reset_flags) | self.set_flags).value
         self.state.good_status = new_status
         if self.dct['status'] != new_status:
-            print(f'Replace status: {status} => {STATUS(new_status)}')
+            # print(f'Replace status: {status} => {STATUS(new_status)}')
             self.payload[self.flags_position : self.flags_position + 5] = spack = struct.pack(
                 '!BI', 0x1d, new_status
             )
@@ -88,66 +89,19 @@ class GameObject:
             self.state.add_enemy(self.entry.id, self.entry.pos_x, self.entry.pos_y, {})
 
         name = self.dct.get('name')
+        add_bag = True
         if name and name.endswith('/8'):
-            # 533f => potion crate
-            # 0a34 => vitality
-            # 0a20 => def
-            idx = 0
-            for i in range(0x8, 0x10):
-                continue
-                if i in MAPPING:
-                    name = MAPPING[i][0]
-                else:
-                    name = hex(i)
-                item = self.dct[name]
-                if item in AUTOUSE:
-                    out_type = 49
-                    ts = self.state.gen_ts() + idx
-                    if ts == self.state.ts:
-                        ts += 1
-                    _id = self.entry.id
-                    i1 = 0
-                    i2 = 0
-                    b1 = 1
-                    pl = struct.pack('!BIIBIIIB', out_type, ts, _id, idx, item, i1, i2, b1)
-                    what = payload_to_packet(pl)
-                    self.state.ts_ensure_bigger = ts
-                    assert len(what) == 23 + 4
-                    # self.state.to_interact.append([out_type, ts, _id, idx, item, i1, i2, b1])
-                    msg = f'!!Autoopen: {what}   TS: {self.state.ts} Gen: {ts} : {idx} && {i}\n'
-                    print(msg)
-                    # self.state.log_write(msg)
-                    # self.state.to_send.append(what)
-                    # self.state.remote_writer.write(what)
-
-                    def _run():
-                        ts = self.state.gen_ts()
-                        while ts - self.state.ts < 30:
-                            ts = self.state.gen_ts()
-                        pl = struct.pack('!BIIBIIIB', out_type, ts, _id, idx, item, i1, i2, b1)
-                        what = payload_to_packet(pl)
-                        self.state.log_write(f'Write to remote writer: {what}\n')
-                        self.state.remote_writer.write(what)
-                        print(f'State TS: {self.state.ts} VS {ts} == {self.state.ts - ts}')
-                        self.state.prev_49 = ts
-
-                    # self.state.schedule(_run)
-                idx += 1
-            # self.state.add_bag(self)
-            if not hasattr(self.entry, 'obj_type'):
-                pass
-            else:
+            if hasattr(self.entry, 'obj_type'):
                 self.state.add_bag(self)
-                print(
-                    f'Got bag entry: {self.dct} => Type: {hex(self.entry.obj_type)} {bin(self.entry.obj_type)} EID: {self.entry.id}'
-                )
+                add_bag = False
+                # print(f'Got bag entry: {self.dct} => Type: {hex(self.entry.obj_type)} {bin(self.entry.obj_type)} EID: {self.entry.id}')
 
         if name == 'cybergrind':
             self.state.set_new_me(self)
             if hasattr(self.entry, 'x_pos'):
                 self.state.set_mypos(self.entry.x_pos, self.entry.y_pos)
 
-        if self.entry.id in self.state.bags:
+        if self.entry.id in self.state.bags and add_bag:
             self.state.add_bag(self)
 
         if self.state.me and self.state.me.entry.id == self.entry.id:
@@ -192,10 +146,10 @@ def decode_object(obj):
         return dct
     for kv in obj.dct:
         key = kv.key
-        dct_key, dct_value = MAPPING.get(key, (hex(key), 'value'))
+        dct_key, dct_value = const.MAPPING.get(key, (hex(key), 'value'))
         value = raw_value = getattr(kv.value, dct_value)
-        if dct_key in SLOTS:
-            value = ITEM.get(raw_value)
+        if 'bag_' in dct_key or 'slot_' in dct_key or 'item_' in dct_key:
+            value = const.ITEM.get(raw_value)
         dct[dct_key] = value
         if dct[dct_key] == 0xffffffff:
             dct[dct_key] = 'empty'
@@ -204,18 +158,20 @@ def decode_object(obj):
 
 
 def handle_my_stats(payload, dct):
-    print(dct)
+    # print(dct)
     if 'SPD' not in dct:
         return payload
     search_for = struct.pack('!BIBI', 0x14, dct['ATT'], 0x15, dct['DEF'])
-    struct_idx = payload.index(search_for)
+    struct_idx = payload.find(search_for)
+    if struct_idx == -1:
+        return payload
     assert struct_idx > 0, 'Cannot find struct'
 
     def replace(_key, name, new_value):
         old = struct.pack('!BI', _key, dct[name])
         new = struct.pack('!BI', _key, new_value)
         idx = payload.find(old, struct_idx)
-        payload[idx : idx + 5] = new
+        payload[idx: idx + 5] = new
 
     replace(0x16, 'SPD', 75)
     replace(0x1c, 'DEX', dct['DEX'] + 25)
@@ -245,6 +201,17 @@ def analyze_objects(state, payload):
     if hasattr(obj, 'end_entity'):
         other_dct = decode_object(obj.end_entity)
         if other_dct:
+            state.log_write(f'New end_entity: {other_dct}\n')
+            dct_w = {}
+            for k, v in other_dct.items():
+                if 'bag_' in k or 'slot_' in k or 'item_' in k:
+                    if not isinstance(v, const.ITEM) and v != 'empty':
+                        dct_w[k] = v
+            if dct_w:
+                state.log_write('unk_dct: \n')
+                for k, v in dct_w.items():
+                    state.log_write(f'    {k} = {v}\n')
+
             state.update_me_dct(other_dct)
             payload = handle_my_stats(payload, other_dct)
             payload = handle_my_inventory(payload, other_dct)
@@ -274,7 +241,7 @@ def log_unpack(state, unpacker, payload, log_all=False):
     try:
         return unpacker.from_bytes(payload)
     except Exception:
-        # print('nok packet')
+        print('nok packet')
         if not log_all:
             save_packet(state, payload)
 

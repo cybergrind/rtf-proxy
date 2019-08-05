@@ -29,7 +29,7 @@ def payload_to_packet(payload):
     return struct.pack('!I', len(payload) + 4) + payload
 
 
-with open('sample_59_fpanel.bin', 'wb') as f:
-    f.write( b';\x008\xee\xb1B\xa5\x00\x00B\xcd\x00\x00\x00\x00\x02p\x00\x00\x00\n!\x00\x00\x02o\x0b\xff\xff\xff\xff')
+with open('sample_23_blue_nick.bin', 'wb') as f:
+    f.write(b'\x17\x00\x03Fur\x00\x00\xff\xff\x00\x05\x91\x12\x00\x00\x008\x05\x00\x00\x00\x04tysm\x00\x04tysm')
 
 

@@ -1,3 +1,5 @@
+import sys
+import traceback
 import asyncio
 import json
 import math
@@ -12,14 +14,25 @@ from rtf_proxy.bullet_analysis import (
     process_hit_ack,
 )
 from rtf_proxy.obj_analysis import analyze_objects, artificial_status
-from rtf_proxy.const import AUTOUSE, SKILL
+
+from rtf_proxy.const import SAFE_LOCATIONS
 from rtf_proxy.packet_tools import encode_packet, format_packet, print_unpack, save_packet
 from rtf_proxy.state import new_state
 
 VAULT_PACKET = b'\x01\x00\x05Vault\x00\x00\x00\x00\x00\x00\x08\x02\x00\x00ai'
-SAFE_LOCATIONS = [b'Nexus', b'Market', b'Vault']
 
 out_writer = None
+
+
+def log_err(fun):
+    async def _wrapped(*args, **kwargs):
+        try:
+            return await fun(*args, **kwargs)
+        except Exception as e:
+            print(f'E: {e}')
+            traceback.print_exc()
+            raise
+    return _wrapped
 
 
 def goto_vault(writer):
@@ -29,6 +42,7 @@ def goto_vault(writer):
     writer.close()
 
 
+@log_err
 async def out_loop(state, reader, writer):
     global mypos
     # asyncio.create_task(deferred_vault(writer))
@@ -77,7 +91,7 @@ async def out_loop(state, reader, writer):
         if _type not in (3, 27, 30, 31, 35, 51, 76, 82, 84, 80, 89, 154):
             print(f'Out: {format_packet(payload[:100])}')
 
-        if _type in (49, 59, 102, 51):
+        if _type in (None, ): # (49, 59, 102, 51)
             save_packet(state, payload)
             # print(format_packet(payload))
 
@@ -90,36 +104,12 @@ async def out_loop(state, reader, writer):
         if _type in (35,):
             process_hit_ack(state, payload)
             skip = True
+        if _type == 84:
+            skip = state.handle_cmd(payload)
         elif _type == 8:
             # AOE ack
             process_aoe_dmg(state, payload)
             skip = True
-        elif _type == 49:
-            # interaction
-            out = list(struct.unpack('!BIIBIIIB', payload))
-            # print(f'State TS: {state.ts} VS {out[1]} == {state.ts - out[1]}')
-            idx = out[3]
-            item_id = out[4]
-            if item_id in SKILL:
-                pass
-            elif item_id not in AUTOUSE:
-                print(f'Interact with: {hex(item_id)} IN {idx}')
-            state.prev_49 = out[1]
-            out[1] = state.gen_ts()
-            payload = struct.pack('!BIIBIIIB', *out)
-            if state.to_interact and False:
-                ts = state.gen_ts()
-                out = state.to_interact.pop()
-                out[1] = ts
-                payload = struct.pack('!BIIBIIIB', *out)
-                msg = f'!!! Run Interaction: {out}'
-                print(msg)
-                state.log_write(msg)
-            # payload = bytearray(payload)
-            # out = list(struct.unpack('!BIIBIIIB', payload))
-            # ts = state.gen_ts()
-            # out[1] = ts
-            # payload = struct.pack('!BIIBIIIB', *out)
         elif _type == 98:
             # damaged by lava
             process_aoe_dmg(state, payload)
@@ -165,6 +155,7 @@ async def out_loop(state, reader, writer):
             print(f'OUT Skip packet... {_type}')
 
 
+@log_err
 async def in_loop(state, reader, writer):
     # asyncio.create_task(artificial_status(state, writer))
     while True:
@@ -201,15 +192,17 @@ async def in_loop(state, reader, writer):
 
         if _type in (1,):
             state.enemies = {}
-            if any([x in payload for x in SAFE_LOCATIONS]):
+            _id, _size = struct.unpack('!BH', payload[:3])
+            state.location = payload[3:3 + _size]
+            if state.location in SAFE_LOCATIONS:
                 state.safe = True
             else:
                 state.safe = False
-            print(f'Location to: {state.safe}')
+            print(f'Location to: {state.location} Is safe: "{state.safe}')
         elif _type == 159:
             state.on_teleport(payload)
 
-        if _type in (None, 79, 85):
+        if _type in (None, 23):
             save_packet(state, payload)
 
         # if b'\x00\x00\x03\xdb' in payload:

@@ -177,7 +177,7 @@ def process_aoe_dmg(state, payload):
         assert len(payload) == 15
         dmg = payload[7]
         _type, landed_on, flag, dmg, some_short, from_who, some_flag2 = struct.unpack('!BIHBHIB', payload)
-        print(f'ME: {state.me.entry.id} => TGT: {landed_on} F: {flag} DMG: {dmg} SS: {some_short} OWN: {from_who} F2: {some_flag2}')
+        # print(f'ME: {state.me.entry.id} => TGT: {landed_on} F: {flag} DMG: {dmg} SS: {some_short} OWN: {from_who} F2: {some_flag2}')
         if landed_on != state.me.entry.id:
             return
         state.calc_burst(dmg)
@@ -189,16 +189,16 @@ def process_aoe_dmg(state, payload):
             state.add_expected_dmg(dmg)
         else:
             if state.hp_delta < 0:
-                print(f'Old AOE DMG: {payload} Use delta: {state.hp_delta}')
+                # print(f'Old AOE DMG: {payload} Use delta: {state.hp_delta}')
                 state.add_expected_dmg(-state.hp_delta)
             else:
-                print(f'Old AOE DMG: {payload} Cannot use hp_delta: {state.hp_delta}')
+                # print(f'Old AOE DMG: {payload} Cannot use hp_delta: {state.hp_delta}')
                 state.add_expected_dmg(state.prev_damage)
     elif _type == 8:
         # AOE ACK
-        print('type 8')
+        # print('type 8')
         dmg = struct.unpack('!H', payload[15:17])[0]
-        print(f'AOE Ack dmg with packet: {dmg}')
+        # print(f'AOE Ack dmg with packet: {dmg}')
         state.add_expected_dmg(dmg)
 
 
