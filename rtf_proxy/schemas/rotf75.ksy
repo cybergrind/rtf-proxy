@@ -65,9 +65,9 @@ types:
   coord:
     seq:
       - id: pos_x
-        type: u4
+        type: f4
       - id: pos_y
-        type: u4
+        type: f4
   unk_byte_0:
     seq:
       - id: always_zero

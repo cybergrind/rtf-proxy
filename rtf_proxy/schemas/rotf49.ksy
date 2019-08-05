@@ -15,5 +15,11 @@ seq:
     type: u1
   - id: itm
     type: u4
+  - id: pos_x
+    type: f4
+  - id: pos_y
+    type: f4
+  - id: byte
+    type: u1
   - id: rest
     size-eos: true

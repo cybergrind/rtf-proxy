@@ -29,7 +29,6 @@ def payload_to_packet(payload):
     return struct.pack('!I', len(payload) + 4) + payload
 
 
-with open('sample_23_blue_nick.bin', 'wb') as f:
-    f.write(b'\x17\x00\x03Fur\x00\x00\xff\xff\x00\x05\x91\x12\x00\x00\x008\x05\x00\x00\x00\x04tysm\x00\x04tysm')
-
+with open('sample_49_necro_2', 'wb') as f:
+    f.write(b'1\x00\x0e\xcc\xbc\x00\x07\x91\xc3\x01\x00\x00V\x8aB\xb2\n=B\xa8\x14{\x01')
 

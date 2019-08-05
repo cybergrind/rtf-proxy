@@ -2,6 +2,7 @@ from enum import Flag, IntEnum, auto
 from itertools import chain
 
 SAFE_LOCATIONS = [b'Nexus', b'Market', b'Vault']
+NO_ACTION = [b'Market']
 NO_PICKUP = [b'Vault']
 
 
@@ -80,13 +81,15 @@ MAPPING = {
 }
 
 # SLOTS + BAG
-SLOTS_NAMES = list(chain(range(0xc, 0x14), range(0x47, 0x4f)))
+INV = range(0xc, 0x14)
+SLOTS_NAMES = list(chain(range(0x8, 0xc), INV, range(0x47, 0x4f)))
 SLOTS = list(
     zip(
         SLOTS_NAMES,
-        range(4, 20)
+        range(20)
     ),
 )
+SLOTS_ID_TO_IDX = dict(SLOTS)
 # SLOTS = list(range(0xc, 0x14))
 
 
@@ -188,7 +191,7 @@ class ITEM(IntEnum):
     KAT_UT_SALJU_F3 = 9087
     MP_T3 = 2750
     SEAL_T5 = 2645
-    CLOACK_T3= 2779
+    CLOAK_T3 = 2779
     SWORD_UT_FROSTBITE_F3 = 9612
     SWORD_T0 = 2560
     BACKPACK = 3180
@@ -198,6 +201,7 @@ class ITEM(IntEnum):
     ORB_T3 = 2628
     KAT_UT_DIAM_F1 = 8842
     TRAP_T3 = 2740
+    CHAR_UNLOCKER = 810
     CHEST_UNLOCKER = 811
     GHOST_RUM = 3109
     KAT_T10 = 3150
@@ -332,6 +336,46 @@ class ITEM(IntEnum):
     CLOAK_T1 = 2647
     VIT_T5 = 2762
     KAT_T13 = 586
+    LUCKY_BOX = 21647
+    LUCKY_KEY = 21650
+    BOW_T4 = 2679
+    STAFF_ST_FIRE_F5 = 21772
+    WAND_T6 = 2621
+    FIRE_SWORD = 2619
+    SHIELD_T2 = 2570
+    BOW_T3 = 2678
+    HP_T1 = 2599
+    ARMOR_T13 = 2812
+    POISON_T2 = 2725
+    SCEPTER_T2 = 2863
+    SKULL_T1 = 2731
+    SWORD_T1 = 2668
+    BOW_T1 = 2677
+    SKULL_ST_MEMENTO_F6 = 2525
+    EGG = 2729
+    SEAL_T1 = 2777
+    SKULL_T0 = 2730
+    DEF_T2 = 2602
+    GL_ESSENCE = 22401
+    SUR_T0 = 3155
+    ORB_UT_ORN_F6 = 22359
+    PRISM_UT_GEM_F7 = 22372
+    NODE_HEALTH = 22616
+    RING_ENCOUNTER_F4 = 22143
+    LARMOR_T15 = 2512
+    WAND_T14 = 2496
+    ROBE_T15 = 2512
+    WAND_T5 = 2566
+    ATT_T2 = 2601
+    ARMOR_T1 = 2683
+    SWORD_T4 = 2670
+    LARMOR_T12 = 2704
+    LIGHT_GOD_RING_F6 = 21260
+    SUR_T2 = 3157
+    WAND_ST_WINGED_F5 = 21780
+    BOOT_T2 = 2610
+    DAG_ST_ETHER_F4 = 8608
+    SKULL_T2 = 2732
 
     @staticmethod
     def get(value):
@@ -341,6 +385,12 @@ class ITEM(IntEnum):
             return value
 
 I = ITEM
+
+SKULLS = {
+    I.SKULL_CHOCO: {'type': 'dmg'},
+    I.SKULL_TORMENT: {'type': 'hp'},
+}
+
 SKILL = [I.SKULL_CHOCO, I.SKULL_TORMENT]
 LOOT = [I.ATT, I.DEX]
 AUTOUSE = [I.POTION_CRATE, I.ITEM_CRATE, I.VIT, I.WIS, I.DEF, I.GREEN_CRATE, I.MANA_POTION,
@@ -348,12 +398,17 @@ AUTOUSE = [I.POTION_CRATE, I.ITEM_CRATE, I.VIT, I.WIS, I.DEF, I.GREEN_CRATE, I.M
            I.SPD,
            I.ATT, I.DEX,  # comment for loot
            I.HP_POTION, I.ALCHEM, I.MAGN_RECEIPT, I.ANT_POTION, I.RIGGED_ALCHEMIST, I.MYST_COIN,
-           I.FUEL_PUMP, I.FUEL_CART]
+           I.FUEL_PUMP, I.FUEL_CART, I.LUCKY_BOX, I.EGG]
 AUTOPICKUP = [I.SPD, I.ATT, I.MANA, I.HP, I.DEX, I.SPECIAL_CRATE, I.SKULL_CHOCO, I.SKULL_TORMENT,
-              I.BACKPACK, I.CHEST_UNLOCKER, I.QUEST_CHEST, I.ECOIN1,
+              # I.BACKPACK, 
+              I.CHAR_UNLOCKER, I.CHEST_UNLOCKER, I.QUEST_CHEST, I.ECOIN1,
               I.HP_T6, I.DEX_2X, I.HP_2X, I.ATT_2X, I.INC_RING,
-              I.STAFF_T14, I.ROBE_INCUMB_F5,
+              I.STAFF_T14, I.ROBE_INCUMB_F5, I.LUCKY_KEY, I.STAFF_ST_FIRE_F5,
+              I.FIRE_SWORD, I.SKULL_ST_MEMENTO_F6, I.GL_ESSENCE,
+              I.LARMOR_T15, I.WAND_T14, I.ROBE_T15,
+              I.WAND_ST_WINGED_F5, I.LIGHT_GOD_RING_F6,
               ]
 AUTOUSE_ON_FULL = [I.SPD, I.ATT, I.MANA, I.HP, I.DEX]
 WARN = []
-IMPORTANT = [I.FLAME_IN_BOTTLE, I.SKULL_CHOCO, I.SPECIAL_CRATE, I.GREEN_CRATE, I.HP_T6]
+IMPORTANT = [I.FLAME_IN_BOTTLE, I.SKULL_CHOCO, I.SPECIAL_CRATE, I.GREEN_CRATE, I.HP_T6,
+             I.STAFF_ST_FIRE_F5]

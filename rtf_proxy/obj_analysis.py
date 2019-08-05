@@ -38,23 +38,21 @@ class GameObject:
         | STATUS.UNSTABLE
         | STATUS.DARKNESS
     )
-    set_flags = (STATUS.DAMAGING
-                 | STATUS.SPEEDY
-                 | STATUS.BERSERK
-                 | STATUS.SPEEDY2)
+    # set_flags = STATUS.DAMAGING | STATUS.SPEEDY | STATUS.BERSERK | STATUS.SPEEDY2
+    set_flags = STATUS.DAMAGING | STATUS.BERSERK | STATUS.SPEEDY
 
     @property
     def position(self):
         if self._position:
             return self._position
-        if not hasattr(self.entry, 'x_pos'):
+        if not hasattr(self.entry, 'pos_x'):
             return
-        b = struct.pack('!III', self.entry.id, self.entry.x_pos, self.entry.y_pos)
+        b = struct.pack('!Iff', self.entry.id, self.entry.pos_x, self.entry.pos_y)
         self._position = self.payload.find(b)
         return self._position
 
     def fix_items(self):
-        if not hasattr(self.entry, 'x_pos') or not self.dct['0x9']:
+        if not hasattr(self.entry, 'pos_x') or not self.dct['0x9']:
             return
         return
         spack = struct.pack('!BI', 0x9, self.dct['0x9'])
@@ -66,7 +64,7 @@ class GameObject:
             self.payload[location : location + 5] = struct.pack('!BI', 0x9, new_item)
 
     def reset_effects(self):
-        if not hasattr(self.entry, 'x_pos'):
+        if not hasattr(self.entry, 'pos_x'):
             # print(f'No pos effect: {STATUS(self.dct["status"])}')
             return
         # print(f'{STATUS(self.dct["status"])}')
@@ -82,32 +80,35 @@ class GameObject:
             )
 
     def decode_object(self, obj):
+        if self.entry.id in self.state.enemies and hasattr(self.entry, 'pos_x'):
+            self.state.add_enemy(self.entry.id, self.entry.pos_x, self.entry.pos_y, {})
+
         if obj.num_fields == 0:
             return
         self.dct = decode_object(obj)
-        if self.entry.id in self.state.enemies and hasattr(self.entry, 'pos_x'):
-            self.state.add_enemy(self.entry.id, self.entry.pos_x, self.entry.pos_y, {})
 
         name = self.dct.get('name')
         add_bag = True
         if name and name.endswith('/8'):
             if hasattr(self.entry, 'obj_type'):
+                self.move_object()
                 self.state.add_bag(self)
                 add_bag = False
                 # print(f'Got bag entry: {self.dct} => Type: {hex(self.entry.obj_type)} {bin(self.entry.obj_type)} EID: {self.entry.id}')
 
         if name == 'cybergrind':
             self.state.set_new_me(self)
-            if hasattr(self.entry, 'x_pos'):
-                self.state.set_mypos(self.entry.x_pos, self.entry.y_pos)
+            if hasattr(self.entry, 'pos_x'):
+                self.state.set_mypos(self.entry.pos_x, self.entry.pos_y)
 
         if self.entry.id in self.state.bags and add_bag:
+            self.move_object()
             self.state.add_bag(self)
 
         if self.state.me and self.state.me.entry.id == self.entry.id:
             self.state.update_me_dct(self.dct)
             _type = struct.unpack('!B', self.payload[:1])[0]
-            if len(self.dct) > 1:
+            if len(self.dct) > 2:
                 print(f'Ptype: {_type} => {self.dct}')
             if self.dct.get('status'):
                 self.reset_effects()
@@ -115,6 +116,28 @@ class GameObject:
             if self.dct.get('0x9'):
                 self.fix_items()
             # print(self.state.me.dct)
+
+        raw = self.dct.raw
+        if (
+            0x1f in raw
+            and 0x3d in raw
+            and 0x2 in raw
+            and raw[0x3d] == 0xffffffff
+            and raw[0x2] == 0x64
+        ):
+            self.process_location(obj)
+
+    def move_object(self, delta=1.0):
+        _id = self.entry.id
+        pos_x = self.entry.pos_x
+        pos_y = self.entry.pos_y
+        to_replace = struct.pack('!Iff', _id, pos_x, pos_y)
+        new_location = struct.pack('!Iff', _id, pos_x + delta, pos_y + delta)
+        self.payload = self.payload.replace(to_replace, new_location)
+
+    def process_location(self, obj):
+        # print(f'GOT LOCATION => {self.dct["name"]} => {self.dct} [{self.entry.pos_x} / {self.entry.pos_y}]')
+        return
 
 
 async def artificial_status(state, writer):
@@ -125,9 +148,9 @@ async def artificial_status(state, writer):
         if state.safe:
             continue
         me = state.me.entry
-        mask = '!BQHIIIHBI'
+        mask = '!BQHIffHBI'
         pl = struct.pack(
-            mask, 85, state.ts + 1, 1, me.id, me.x_pos, me.y_pos, 1, 0x1d, state.good_status
+            mask, 85, state.ts + 1, 1, me.id, me.pos_x, me.pos_y, 1, 0x1d, state.good_status
         )
         print(f'Write pl: {pl}')
         writer.write(pl)
@@ -148,6 +171,11 @@ def decode_object(obj):
         key = kv.key
         dct_key, dct_value = const.MAPPING.get(key, (hex(key), 'value'))
         value = raw_value = getattr(kv.value, dct_value)
+        if dct_key == 'max_hp':
+            if value > 19293798:
+                dct[dct_key] = raw_value
+                dct.raw[key] = raw_value
+                continue
         if 'bag_' in dct_key or 'slot_' in dct_key or 'item_' in dct_key:
             value = const.ITEM.get(raw_value)
         dct[dct_key] = value
@@ -162,7 +190,7 @@ def handle_my_stats(payload, dct):
     if 'SPD' not in dct:
         return payload
     search_for = struct.pack('!BIBI', 0x14, dct['ATT'], 0x15, dct['DEF'])
-    struct_idx = payload.find(search_for)
+    struct_idx = payload.find(search_for, len(payload) - 200)
     if struct_idx == -1:
         return payload
     assert struct_idx > 0, 'Cannot find struct'
@@ -171,9 +199,9 @@ def handle_my_stats(payload, dct):
         old = struct.pack('!BI', _key, dct[name])
         new = struct.pack('!BI', _key, new_value)
         idx = payload.find(old, struct_idx)
-        payload[idx: idx + 5] = new
+        payload[idx : idx + 5] = new
 
-    replace(0x16, 'SPD', 75)
+    replace(0x16, 'SPD', 95)
     replace(0x1c, 'DEX', dct['DEX'] + 25)
     return payload
 
@@ -197,7 +225,8 @@ def analyze_objects(state, payload):
         state.__ts = obj.ts
     if obj.num_entries > 0:
         for entry in obj.entries:
-            GameObject(state, entry, payload)
+            o = GameObject(state, entry, payload)
+            payload = o.payload
     if hasattr(obj, 'end_entity'):
         other_dct = decode_object(obj.end_entity)
         if other_dct:
@@ -211,7 +240,6 @@ def analyze_objects(state, payload):
                 state.log_write('unk_dct: \n')
                 for k, v in dct_w.items():
                     state.log_write(f'    {k} = {v}\n')
-
             state.update_me_dct(other_dct)
             payload = handle_my_stats(payload, other_dct)
             payload = handle_my_inventory(payload, other_dct)

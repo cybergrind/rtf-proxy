@@ -119,8 +119,14 @@ def process_bullet(state, payload):
         # replace('pos_x', b'\x00\x00\x00\x00')
         # replace('pos_y', b'\x00\x00\x00\x00')
         owner = get('owner', 4, '!I')
-        pos_x = get('pos_x', 4, '!I')
-        pos_y = get('pos_y', 4, '!I')
+        if owner in state.enemies:
+            e = state.enemies[owner]
+            pos_x = e['pos_x']
+            pos_y = e['pos_y']
+        else:
+            print(f'TEMPORARY POS')
+            pos_x = get('pos_x', 4, '!f')
+            pos_y = get('pos_y', 4, '!f')
         owner_bullet = get('owner_bullet', 1, '!B')
         dmg = get('dmg', 2, '!H')
         # assert dmg < 300, payload

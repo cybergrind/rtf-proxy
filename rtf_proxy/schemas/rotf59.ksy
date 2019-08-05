@@ -10,9 +10,9 @@ seq:
   - id: ts
     type: u4
   - id: pos_x
-    type: u4
+    type: f4
   - id: pos_y
-    type: u4
+    type: f4
   - id: inv_id
     type: u4
   - id: idx

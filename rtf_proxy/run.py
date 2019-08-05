@@ -22,6 +22,7 @@ from rtf_proxy.state import new_state
 VAULT_PACKET = b'\x01\x00\x05Vault\x00\x00\x00\x00\x00\x00\x08\x02\x00\x00ai'
 
 out_writer = None
+SAVE_PACKETS = [None, 59]
 
 
 def log_err(fun):
@@ -91,7 +92,7 @@ async def out_loop(state, reader, writer):
         if _type not in (3, 27, 30, 31, 35, 51, 76, 82, 84, 80, 89, 154):
             print(f'Out: {format_packet(payload[:100])}')
 
-        if _type in (None, ): # (49, 59, 102, 51)
+        if _type in SAVE_PACKETS: # (49, 59, 102, 51)
             save_packet(state, payload)
             # print(format_packet(payload))
 
@@ -122,7 +123,7 @@ async def out_loop(state, reader, writer):
         elif _type == 51:
             # print(format_packet(payload))
             # print_unpack('!BIIII', payload)
-            out = list(struct.unpack('!BIIII', payload))
+            out = list(struct.unpack('!BIIff', payload))
             packet_id = out[1]
             ts = out[2]
             state.set_mypos(out[3], out[4])
@@ -130,9 +131,9 @@ async def out_loop(state, reader, writer):
             if new:
                 out[2] = new
                 print('Repack...')
+                payload = struct.pack('!BIIff', *out)
             if state.scheduled:
                 print(f'Packet: {packet_id} Scheduled: {state.scheduled}')
-            payload = struct.pack('!BIIII', *out)
             if packet_id in state.scheduled:
                 after = state.scheduled.pop(packet_id)
 
@@ -193,20 +194,19 @@ async def in_loop(state, reader, writer):
         if _type in (1,):
             state.enemies = {}
             _id, _size = struct.unpack('!BH', payload[:3])
-            state.location = payload[3:3 + _size]
-            if state.location in SAFE_LOCATIONS:
-                state.safe = True
-            else:
-                state.safe = False
-            print(f'Location to: {state.location} Is safe: "{state.safe}')
+            state.update_location(payload[3:3 + _size])
         elif _type == 159:
             state.on_teleport(payload)
 
-        if _type in (None, 23):
+        if _type in SAVE_PACKETS:
             save_packet(state, payload)
 
         # if b'\x00\x00\x03\xdb' in payload:
         #     print(f'Health in in: {format_packet(payload)}')
+        # if _type == 79:
+        #     if state.location == b'Vault' and not hasattr(state, 'hack'):
+        #         skip = True
+        #         state.hack = True
 
         if _type == 85:
             global samples

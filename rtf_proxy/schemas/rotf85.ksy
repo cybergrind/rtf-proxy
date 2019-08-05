@@ -9,8 +9,10 @@ meta:
 seq:
   - id: p_type
     type: u1
-  - id: ts
-    type: u8
+  - id: counter
+    type: u4
+  - id: timeout
+    type: u4
   - id: num_entries
     type: u2
   - id: entries
@@ -27,9 +29,9 @@ types:
     seq:
       - id: id
         type: u4
-      - id: x_pos
-        type: u4
-      - id: y_pos
-        type: u4
+      - id: pos_x
+        type: f4
+      - id: pos_y
+        type: f4
       - id: object
         type: base
