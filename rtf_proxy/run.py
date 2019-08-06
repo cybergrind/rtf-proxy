@@ -29,6 +29,8 @@ def log_err(fun):
     async def _wrapped(*args, **kwargs):
         try:
             return await fun(*args, **kwargs)
+        except asyncio.IncompleteReadError:
+            pass
         except Exception as e:
             print(f'E: {e}')
             traceback.print_exc()
