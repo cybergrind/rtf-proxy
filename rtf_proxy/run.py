@@ -22,7 +22,7 @@ from rtf_proxy.state import new_state
 VAULT_PACKET = b'\x01\x00\x05Vault\x00\x00\x00\x00\x00\x00\x08\x02\x00\x00ai'
 
 out_writer = None
-SAVE_PACKETS = [None, 59]
+SAVE_PACKETS = [None, ]
 
 
 def log_err(fun):

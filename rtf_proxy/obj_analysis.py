@@ -188,12 +188,23 @@ def decode_object(obj):
     return dct
 
 
+def find_last(payload, what):
+    idx = -10
+    while True:
+        found = payload.find(what, idx + 10)
+        # print(f'Found {found}')
+        if found == -1:
+            break
+        idx = found
+    return idx
+
+
 def handle_my_stats(payload, dct):
     # print(dct)
     if 'SPD' not in dct:
         return payload
     search_for = struct.pack('!BIBI', 0x14, dct['ATT'], 0x15, dct['DEF'])
-    struct_idx = payload.find(search_for, len(payload) - 200)
+    struct_idx = find_last(payload, search_for)
     if struct_idx == -1:
         return payload
     assert struct_idx > 0, 'Cannot find struct'

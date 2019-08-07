@@ -41,6 +41,9 @@ class STATUS(Flag):
     B32 = auto()
 
 
+"""
+0x27 = fame
+"""
 MAPPING = {
     0x00: ('max_hp', 'value'),
     0x01: ('hp', 'value'),
@@ -388,6 +391,12 @@ class ITEM(IntEnum):
     PRISM_T6 = 2851
     WIS_T2 = 2617
     PRISM_T0 = 2787
+    DAG_UT_SUNSHINE = 3309
+    DAG_T10 = 2697
+    PRISM_UT_GHOSTLY_F6 = 3114
+    RING_MYST_ENCOUNTER = 22144
+    DEX_T2 = 2638
+    SEAL_T2 = 2643
 
     @staticmethod
     def get(value):
@@ -419,7 +428,8 @@ AUTOPICKUP = [I.SPD, I.ATT, I.MANA, I.HP, I.DEX, I.SPECIAL_CRATE, I.SKULL_CHOCO,
               I.FIRE_SWORD, I.SKULL_ST_MEMENTO_F6, I.GL_ESSENCE,
               I.LARMOR_T15, I.WAND_T14, I.ROBE_T15,
               I.WAND_ST_WINGED_F5, I.LIGHT_GOD_RING_F6,
-              I.HELM_T6, I.EPIC_QUEST_CHEST, I.PRISM_T6
+              I.HELM_T6, I.EPIC_QUEST_CHEST, I.PRISM_T6,
+              I.RING_MYST_ENCOUNTER,
               ]
 AUTOUSE_ON_FULL = [I.SPD, I.ATT, I.MANA, I.HP, I.DEX]
 WARN = []
