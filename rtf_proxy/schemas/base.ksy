@@ -25,6 +25,7 @@ types:
             0x36: str_var
             0x61: str_var
             0x63: str_var
+            0x66: str_var
             _: int_var
   int_var:
     seq:

@@ -382,6 +382,12 @@ class ITEM(IntEnum):
     HELM_T6 = 2857
     BOW_T11 = 2701
     ARMOR_T2 = 2575
+    VIT_T2 = 2616
+    WAND_T0 = 2564
+    EPIC_QUEST_CHEST = 3470
+    PRISM_T6 = 2851
+    WIS_T2 = 2617
+    PRISM_T0 = 2787
 
     @staticmethod
     def get(value):
@@ -398,7 +404,7 @@ SKULLS = {
 }
 
 SKILL = [I.SKULL_CHOCO, I.SKULL_TORMENT]
-LOOT = [I.ATT, I.SPD]
+LOOT = [I.ATT,]
 AUTOUSE = [I.POTION_CRATE, I.ITEM_CRATE, I.VIT, I.WIS, I.DEF, I.GREEN_CRATE, I.MANA_POTION,
            I.VIT_2X,
            I.SPD,
@@ -413,7 +419,7 @@ AUTOPICKUP = [I.SPD, I.ATT, I.MANA, I.HP, I.DEX, I.SPECIAL_CRATE, I.SKULL_CHOCO,
               I.FIRE_SWORD, I.SKULL_ST_MEMENTO_F6, I.GL_ESSENCE,
               I.LARMOR_T15, I.WAND_T14, I.ROBE_T15,
               I.WAND_ST_WINGED_F5, I.LIGHT_GOD_RING_F6,
-              I.HELM_T6,
+              I.HELM_T6, I.EPIC_QUEST_CHEST, I.PRISM_T6
               ]
 AUTOUSE_ON_FULL = [I.SPD, I.ATT, I.MANA, I.HP, I.DEX]
 WARN = []

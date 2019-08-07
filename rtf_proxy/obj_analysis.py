@@ -170,7 +170,10 @@ def decode_object(obj):
     for kv in obj.dct:
         key = kv.key
         dct_key, dct_value = const.MAPPING.get(key, (hex(key), 'value'))
-        value = raw_value = getattr(kv.value, dct_value)
+        if hasattr(kv.value, dct_value):
+            value = raw_value = getattr(kv.value, dct_value)
+        else:
+            value = raw_value = None
         if dct_key == 'max_hp':
             if value > 19293798:
                 dct[dct_key] = raw_value
