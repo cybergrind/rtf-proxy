@@ -215,8 +215,9 @@ def handle_my_stats(payload, dct):
         idx = payload.find(old, struct_idx)
         payload[idx : idx + 5] = new
 
-    replace(0x16, 'SPD', 95)
-    replace(0x1c, 'DEX', dct['DEX'] + 25)
+    replace(0x16, 'SPD', 96)
+    replace(0x1c, 'DEX', min(dct['DEX'] + 25, 240))
+    # replace(0x1b, 'WIS', min(dct['WIS'] + 300, 840))
     return payload
 
 
