@@ -127,7 +127,7 @@ class GameObject:
         ):
             self.process_location(obj)
 
-    def move_object(self, delta=1.0):
+    def move_object(self, delta=1.5):
         _id = self.entry.id
         pos_x = self.entry.pos_x
         pos_y = self.entry.pos_y

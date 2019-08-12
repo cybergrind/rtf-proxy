@@ -1,28 +1,29 @@
-import sys
-import traceback
 import asyncio
 import json
 import math
 import struct
+import sys
+import traceback
 
 from rtf_proxy.bullet_analysis import (
     bullet_double,
+    multiply_damage,
     outcoming_shot,
     process_aoe_dmg,
     process_aoe_shot,
     process_bullet,
     process_hit_ack,
 )
-from rtf_proxy.obj_analysis import analyze_objects, artificial_status
-
 from rtf_proxy.const import SAFE_LOCATIONS
+from rtf_proxy.obj_analysis import analyze_objects, artificial_status
 from rtf_proxy.packet_tools import encode_packet, format_packet, print_unpack, save_packet
 from rtf_proxy.state import new_state
 
 VAULT_PACKET = b'\x01\x00\x05Vault\x00\x00\x00\x00\x00\x00\x08\x02\x00\x00ai'
 
 out_writer = None
-SAVE_PACKETS = [None, ]
+SAVE_PACKETS = [None, 76]
+# , 82, 75
 
 
 def log_err(fun):
@@ -35,6 +36,7 @@ def log_err(fun):
             print(f'E: {e}')
             traceback.print_exc()
             raise
+
     return _wrapped
 
 
@@ -74,16 +76,17 @@ async def out_loop(state, reader, writer):
         # 08 - aoe ack?
         # 27 - shot ack?
         # 35 - shot ack
+        # 49 - use
         # 51 - position
+        # 59 - move to inventory
         # 76 - bullet hit
-        # 82 - shot
+        # 78 - unk
+        # 82 - my shot
         # 84 - outcoming messages
         # 89 - shot landed in something else / wall
         # 98 - damaged by terrain?
-        # 156 - set runes
-        # 49 - use
-        # 59 - move to inventory
         # 102 - drop
+        # 156 - set runes
         # Out: Type: (49,) Payload: b'1\x00$$\x13\x00\x04\xaa8\x00\x00\x00S?\x00\x00\x00\x00\x00\x00\x00\x00\x01'
         # Ptype: 85 => {'mp': 1, 'status': 0, '0x60': 0}
         # Out: Type: (49,) Payload: b'1\x00$C\x06\x00\x04\xaa8\x00\x00\x00\n \x00\x00\x00\x00\x00\x00\x00\x00\x01'
@@ -94,7 +97,7 @@ async def out_loop(state, reader, writer):
         if _type not in (3, 27, 30, 31, 35, 51, 76, 82, 84, 80, 89, 154):
             print(f'Out: {format_packet(payload[:100])}')
 
-        if _type in SAVE_PACKETS: # (49, 59, 102, 51)
+        if _type in SAVE_PACKETS:  # (49, 59, 102, 51)
             save_packet(state, payload)
             # print(format_packet(payload))
 
@@ -103,6 +106,8 @@ async def out_loop(state, reader, writer):
 
         if _type == 82:
             payload = outcoming_shot(state, payload)
+        elif _type == 76:
+            payload = multiply_damage(state, payload)
 
         if _type in (35,):
             process_hit_ack(state, payload)
@@ -185,6 +190,7 @@ async def in_loop(state, reader, writer):
         # 36 - terrain damage notify?
         # 40 - AOE?
         # 75 - enemy shots?
+        # 78 -??
         # 79 - map update
         # 85 - object move?
         # 91 - death note
@@ -196,7 +202,7 @@ async def in_loop(state, reader, writer):
         if _type in (1,):
             state.enemies = {}
             _id, _size = struct.unpack('!BH', payload[:3])
-            state.update_location(payload[3:3 + _size])
+            state.update_location(payload[3 : 3 + _size])
         elif _type == 159:
             state.on_teleport(payload)
 

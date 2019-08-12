@@ -1,7 +1,8 @@
+import asyncio
 import struct
 import random
 from rtf_proxy.state import new_state
-
+from rtf_proxy.packet_tools import payload_to_packet
 counter = 0
 skip = []
 
@@ -35,6 +36,37 @@ def gen_76(shot_id, enemy_id):
         counter += 1
         out.append(struct.pack(mask, 11, 0x4c, 0, shot_id, counter, enemy_id, 0))
     return out
+
+
+MULTIPLY_COEFF = 3
+SKIP_BASE = set()
+
+
+async def delay_delete(ids):
+    SKIP_BASE.update(ids)
+    await asyncio.sleep(10)
+    for i in ids:
+        if i in SKIP_BASE:
+            SKIP_BASE.remove(i)
+
+def multiply_damage(state, payload):
+    mask = '!BBHHIB'
+    curr = struct.unpack(mask, payload)
+    shot_id = curr[2]
+    counter = curr[3]
+    if counter in SKIP_BASE:
+        return payload
+
+    ids = [counter]
+    enemy_id = curr[4]
+    for i in range(MULTIPLY_COEFF):
+        new_counter = counter + 1 + i
+        if new_counter in SKIP_BASE:
+            continue
+        ids.append(new_counter)
+        payload += payload_to_packet(struct.pack(mask, 0x4c, 0, shot_id, new_counter, enemy_id, 0))
+    asyncio.create_task(delay_delete(ids))
+    return payload
 
 
 def outcoming_shot(state, payload):
