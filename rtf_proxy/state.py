@@ -179,7 +179,7 @@ class State:
 
     async def after_shot(self):
         self.shot_allowed = False
-        await asyncio.sleep(0.3)
+        await asyncio.sleep(0.15)
         self.shot_allowed = True
 
     def necro_mode(self):
@@ -238,16 +238,16 @@ class State:
     def handle_enemy(self, enemy):
         if self.mode == 'necro':
             # self.warn_message(f'Handle enemy: mp: {self.me.dct["mp"]} d: {enemy["dist"]}')
-            print(
-                f'Handle enemy: mp: {self.me.dct["mp"]} d: {without(enemy, "bullets")} {self.mypos}'
-            )
+            # print(
+            #     f'Handle enemy: mp: {self.me.dct["mp"]} d: {without(enemy, "bullets")} {self.mypos}'
+            # )
             mp_level = 400
             if self.hp_level < 0.4:
                 mp_level = 120
 
             if self.me.dct['mp'] > mp_level:
                 if enemy['dist'] < 13:
-                    print('Shot they')
+                    # print('Shot they')
                     self.skull_shot([enemy['pos_x'], enemy['pos_y']])
         self.handle_mode()
 
