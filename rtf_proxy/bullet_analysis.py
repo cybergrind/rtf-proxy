@@ -38,7 +38,7 @@ def gen_76(shot_id, enemy_id):
     return out
 
 
-MULTIPLY_COEFF = 3
+MULTIPLY_COEFF = 8
 SKIP_BASE = set()
 
 
@@ -54,16 +54,17 @@ def multiply_damage(state, payload):
     curr = struct.unpack(mask, payload)
     shot_id = curr[2]
     counter = curr[3]
-    if counter in SKIP_BASE:
+    enemy_id = curr[4]
+    if (enemy_id, counter) in SKIP_BASE:
         return payload
 
-    ids = [counter]
+    ids = [(enemy_id, counter)]
     enemy_id = curr[4]
     for i in range(MULTIPLY_COEFF):
         new_counter = counter + 1 + i
-        if new_counter in SKIP_BASE:
+        if (enemy_id, new_counter) in SKIP_BASE:
             continue
-        ids.append(new_counter)
+        ids.append((enemy_id, new_counter))
         payload += payload_to_packet(struct.pack(mask, 0x4c, 0, shot_id, new_counter, enemy_id, 0))
     asyncio.create_task(delay_delete(ids))
     return payload
