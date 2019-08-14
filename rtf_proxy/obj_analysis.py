@@ -2,6 +2,7 @@ import asyncio
 import glob
 import struct
 import time
+from copy import copy
 
 from rtf_proxy import const
 from rtf_proxy.const import STATUS
@@ -27,7 +28,6 @@ class GameObject:
         self.bullets = {}
         self._obj_type = None
         self.decode_object(entry.object)
-
 
     reset_flags = ~(
         STATUS.SILENT
@@ -86,7 +86,12 @@ class GameObject:
         if not hasattr(self.entry, 'pos_x'):
             return
         b = struct.pack('!Iff', self.entry.id, self.entry.pos_x, self.entry.pos_y)
-        self._position = self.payload.find(b)
+        pos = self.payload.find(b)
+        if pos == -1:
+            self.state.log_write(f'Cannot find position: {b}')
+            self.state.log_write(f'Payload for position: {self.payload}')
+            return
+        self._position = pos
         return self._position
 
     @property
@@ -102,7 +107,7 @@ class GameObject:
         assert self.payload[location : location + 5] == spack, spack
         new_item = 2730
         if self.dct['0x9'] != new_item:
-            print(f'Replace skull: {self.dct["0x9"]} => {new_item}')
+            self.state.log_write(f'Replace skull: {self.dct["0x9"]} => {new_item}')
             self.payload[location : location + 5] = struct.pack('!BI', 0x9, new_item)
 
     def reset_effects(self):
@@ -110,23 +115,34 @@ class GameObject:
             # print(f'No pos effect: {STATUS(self.dct["status"])}')
             return
         # print(f'{STATUS(self.dct["status"])}')
+        if not self.position:
+            return
+
         spack = struct.pack('!BI', 0x1d, self.dct['status'])
         self.flags_position = self.payload.find(spack, self.position)
+        if self.flags_position == -1:
+            self.state.log_write(
+                f'Flags position = -1: {spack} / {self.position} / {self.id}\n {self.payload}'
+            )
+            raise NotImplementedError
         status = STATUS(self.dct['status'])
         new_status = ((status & self.reset_flags) | self.set_flags).value
         self.state.good_status = new_status
         if self.dct['status'] != new_status:
             # print(f'Replace status: {status} => {STATUS(new_status)}')
+            self.state.log_write(f'Update status: {self.flags_position}')
             self.payload[self.flags_position : self.flags_position + 5] = spack = struct.pack(
                 '!BI', 0x1d, new_status
             )
 
     def decode_object(self, obj):
+        self.dct = decode_object(obj)
+        self.real_dct = self.dct.copy()
+
+        self.state.add_object(self)
+
         if self.id in self.state.enemies:
             self.state.add_enemy(self)
-
-        self.dct = decode_object(obj)
-        self.state.add_object(self)
 
         if self.msg_type == 79:
             if self.state.is_enemy(self):
@@ -134,7 +150,6 @@ class GameObject:
 
         if obj.num_fields == 0:
             return
-
 
         name = self.dct.get('name')
         add_bag = True
@@ -159,10 +174,10 @@ class GameObject:
             # _type = struct.unpack('!B', self.payload[:1])[0]
             # if len(self.dct) > 2:
             #     print(f'Ptype: {_type} => {self.dct}')
-            if self.dct.get('status'):
+            if self.real_dct.get('status'):
                 self.reset_effects()
                 # import ipdb; ipdb.set_trace()
-            if self.dct.get('0x9'):
+            if self.real_dct.get('0x9'):
                 self.fix_items()
             # print(self.state.me.dct)
 
@@ -183,6 +198,7 @@ class GameObject:
         to_replace = struct.pack('!Iff', _id, pos_x, pos_y)
         new_location = struct.pack('!Iff', _id, pos_x + delta, pos_y + delta)
         self.payload = self.payload.replace(to_replace, new_location)
+        self.state.log_write('Move object')
 
     def process_location(self, obj):
         # print(f'GOT LOCATION => {self.dct["name"]} => {self.dct} [{self.entry.pos_x} / {self.entry.pos_y}]')
@@ -197,6 +213,7 @@ class GameObject:
         self.dct.update(dct)
         if old_obj.name:
             assert self.name
+        assert len(self.dct) >= len(old_obj.dct), f'{self.dct} vs {old_obj.dct}'
 
 
 async def artificial_status(state, writer):
@@ -219,6 +236,11 @@ class MyDict(dict):
     def update(self, what):
         super().update(what)
         self.raw.update(what.raw)
+
+    def copy(self):
+        ret = MyDict(copy(self))
+        ret.raw = copy(self.raw)
+        return ret
 
 
 def decode_object(obj):
@@ -258,7 +280,7 @@ def find_last(payload, what):
     return idx
 
 
-def handle_my_stats(payload, dct):
+def handle_my_stats(state, payload, dct):
     # print(dct)
     if 'SPD' not in dct:
         return payload
@@ -274,6 +296,7 @@ def handle_my_stats(payload, dct):
         idx = payload.find(old, struct_idx)
         payload[idx : idx + 5] = new
 
+    state.log_write('Update stats')
     replace(0x16, 'SPD', 96)
     replace(0x1c, 'DEX', min(dct['DEX'] + 25, 240))
     # replace(0x1b, 'WIS', min(dct['WIS'] + 300, 840))
@@ -315,7 +338,7 @@ def analyze_objects(state, payload):
                 for k, v in dct_w.items():
                     state.log_write(f'    {k} = {v}')
             state.update_me_dct(other_dct)
-            payload = handle_my_stats(payload, other_dct)
+            payload = handle_my_stats(state, payload, other_dct)
             payload = handle_my_inventory(payload, other_dct)
     if _type == 79:
         # 0503 => violet bag

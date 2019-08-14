@@ -263,7 +263,7 @@ class State:
 
             if self.me.dct['mp'] > mp_level:
                 if enemy.dist < 13:
-                    # print('Shot they')
+                    # print(f'Shot they: {enemy.id}: {enemy.status} / {enemy.dct}')
                     self.skull_shot(enemy.pos)
         self.handle_mode()
 
