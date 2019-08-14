@@ -149,17 +149,7 @@ def process_bullet(state, payload):
             idx = 3 + mapping[name] * num_bullets + sz * n
             return struct.unpack(mask, payload[idx:idx + sz])[0]
 
-        # replace('pos_x', b'\x00\x00\x00\x00')
-        # replace('pos_y', b'\x00\x00\x00\x00')
         owner = get('owner', 4, '!I')
-        if owner in state.enemies:
-            e = state.enemies[owner]
-            pos_x = e['pos_x']
-            pos_y = e['pos_y']
-        else:
-            print(f'TEMPORARY POS')
-            pos_x = get('pos_x', 4, '!f')
-            pos_y = get('pos_y', 4, '!f')
         owner_bullet = get('owner_bullet', 1, '!B')
         dmg = get('dmg', 2, '!H')
         # assert dmg < 300, payload
@@ -169,12 +159,7 @@ def process_bullet(state, payload):
             if i > 255:
                 i = i - 256
             bullets[i] = dmg
-        state.add_enemy(owner, pos_x, pos_y, bullets)
-        # payload[pos_x:pos_x + 4] = b'\x00\x00\x00\x00'
-        # payload[pos_y:pos_y + 4] = b'\x00\x00\x00\x00'
-
-        # magic = 3 + mapping['magic'] * num_bullets + 4 * n
-        # payload[magic:magic + 4] = b'\x00\x00\x00\x00'
+        state.add_bullets(owner, bullets)
 
     return bytes(payload)
 
@@ -189,20 +174,15 @@ def process_hit_ack(state, payload):
         # raise Exception(payload)
         return
     enemy = state.enemies[owner_id]
-    if bullet_id not in enemy['bullets']:
-        if len(enemy['bullets']) == 0:
+    if bullet_id not in enemy.bullets:
+        if len(enemy.bullets) == 0:
             print('Cannot find any bullets. Skip: {payload}')
             raise Exception
             return
-        # variants = sorted(enemy['bullets'].keys(), reverse=True)
-        # print('Filter bullets')
-        # key = next(filter(lambda i: i < bullet_id, variants))
-        # bullet_dmg = enemy['bullets'][key]
         print(f'Cannot find bullet: {bullet_id} in {enemy}. Use: {payload}')
         bullet_dmg = 300  # no bullet dmg
-        # raise Exception('no bullet')
     else:
-        bullet_dmg = enemy['bullets'][bullet_id]
+        bullet_dmg = enemy.bullets[bullet_id]
     state.add_expected_dmg(bullet_dmg)
     print(f'Expected dmg bullet: {bullet_dmg} => Total: {state.expected_dmg} hp: {state.hp}')
 

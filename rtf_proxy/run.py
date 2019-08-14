@@ -150,7 +150,7 @@ async def out_loop(state, reader, writer):
 
         state.count_packet(payload)
         state.log_write(
-            f'Outgoing [{state.counter}]: Size: {_size_bytes} [{size}] Payload: {format_packet(payload)}\n\n'
+            f'Outgoing [{state.counter}]: Size: {_size_bytes} [{size}] Payload: {format_packet(payload)}'
         )
         if not skip:
             if state.kill and not writer.is_closing():
@@ -200,11 +200,12 @@ async def in_loop(state, reader, writer):
             print(f'In: {format_packet(payload[:100])}')
 
         if _type in (1,):
-            state.enemies = {}
+            state.clean_temporary()
             _id, _size = struct.unpack('!BH', payload[:3])
             state.update_location(payload[3 : 3 + _size])
         elif _type == 159:
-            state.on_teleport(payload)
+            # state.on_teleport(payload)
+            pass
 
         if _type in SAVE_PACKETS:
             save_packet(state, payload)
@@ -253,7 +254,7 @@ async def in_loop(state, reader, writer):
         state.count_packet(payload)
         state.log_write(
             f'Incoming [{state.counter}]: Size: {_size_bytes}/{len(payload)}/{size} '
-            f'Payload: {format_packet(payload)}\n\n'
+            f'Payload: {format_packet(payload)}'
         )
         if not skip:
             if state.kill and not writer.is_closing():

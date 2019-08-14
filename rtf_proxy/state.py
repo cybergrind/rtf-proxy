@@ -3,6 +3,7 @@ import importlib
 import io
 import json
 import math
+import os
 import struct
 import time
 from collections import defaultdict
@@ -17,6 +18,9 @@ TOLERATE = 20  # AOE memory
 def without(dct, *keys):
     return {k: v for k, v in dct.items() if k not in keys}
 
+
+ENEMIES_FILE = 'known_enemies.json'
+OBJS_FILE = 'known_objects.json'
 
 class State:
     def __init__(self, is_test=False):
@@ -49,6 +53,10 @@ class State:
         self.mode = None
         self.pending_switch = False
         self.shot_allowed = True
+        self.all_objects = {}
+        self.known_enemies = {}
+        self.known_objects = {}
+        self.load_known()
 
     def update_location(self, new_location):
         self.location = new_location
@@ -74,6 +82,9 @@ class State:
             elif _id in self.bags:
                 # print(f'Remove Bag: {self.bags[_id]}')
                 del self.bags[_id]
+
+            if _id in self.all_objects:
+                del self.all_objects[_id]
 
     async def clear_bag(self, _id):
         await asyncio.sleep(self.bag_live)
@@ -130,7 +141,10 @@ class State:
         bin_send_msg = payload[3 : 3 + _size]
         command = bin_send_msg.decode('utf8')
         try:
-            if command == '/cr' or command == 'creload':
+            if command == '/dc':
+                skip = True
+                self.close()
+            elif command == '/cr':
                 skip = True
                 importlib.reload(rtf_proxy.const)
                 self.warn_message('Reloaded...')
@@ -236,8 +250,10 @@ class State:
         )
 
     def handle_enemy(self, enemy):
+        if enemy.status and (enemy.status & const.STATUS.INVULN):
+            return
         if self.mode == 'necro':
-            # self.warn_message(f'Handle enemy: mp: {self.me.dct["mp"]} d: {enemy["dist"]}')
+            # self.warn_message(f'Handle enemy: mp: {self.me.dct["mp"]} d: {enemy.dist}')
             # print(
             #     f'Handle enemy: mp: {self.me.dct["mp"]} d: {without(enemy, "bullets")} {self.mypos}'
             # )
@@ -246,9 +262,9 @@ class State:
                 mp_level = 120
 
             if self.me.dct['mp'] > mp_level:
-                if enemy['dist'] < 13:
+                if enemy.dist < 13:
                     # print('Shot they')
-                    self.skull_shot([enemy['pos_x'], enemy['pos_y']])
+                    self.skull_shot(enemy.pos)
         self.handle_mode()
 
     def add_bag(self, bag):
@@ -321,6 +337,7 @@ class State:
     def clean_temporary(self):
         self.bags = {}
         self.enemies = {}
+        self.all_objects = {}
 
     def add_expected_dmg(self, dmg):
         if self.use_defence:
@@ -395,32 +412,59 @@ class State:
     def get_closest_enemy(self):
         out = list(self.enemies.values())
         if out:
-            out.sort(key=lambda x: x['dist'])
+            out.sort(key=lambda x: x.dist)
             return out[0]
 
-    async def clear_enemy(self, enemy_id):
-        while True:
-            await asyncio.sleep(1)
-            if enemy_id in self.enemies and time.time() - self.enemies[enemy_id]['updated'] > 2:
-                del self.enemies[enemy_id]
-                return
+    def add_object(self, obj):
+        _id = obj.id
+        if _id in self.all_objects:
+            old = self.all_objects[_id]
+            obj.update_from_old(old)
+        self.all_objects[_id] = obj
 
-    def add_enemy(self, enemy_id, pos_x, pos_y, bullets):
-        # print(f'Add enemy: {enemy_id} {pos_x}/{pos_y}')
+        if obj.type_str and obj.name and obj.type_str not in self.known_objects:
+            self.known_objects[obj.type_str] = obj.name
+            with open(OBJS_FILE, 'w') as f:
+                json.dump(self.known_objects, f, indent=2)
+
+        if obj.type_str in self.known_enemies:
+            self.add_enemy(obj)
+
+    def load_known(self):
+        if os.path.exists(ENEMIES_FILE):
+            with open(ENEMIES_FILE) as f:
+                self.known_enemies.update(json.load(f))
+        if os.path.exists(OBJS_FILE):
+            with open(OBJS_FILE) as f:
+                self.known_objects.update(json.load(f))
+
+    def is_enemy(self, obj):
+        return obj.type_str in self.known_enemies
+
+    def mark_as_enemy(self, enemy_id):
+        obj = self.all_objects[enemy_id]
+        if 'name' not in obj.dct:
+            print(f'Cannot add enemy without name: {obj.dct}')
+            return
+        self.known_enemies[obj.type_str] = obj.dct['name']
+
+        with open(ENEMIES_FILE, 'w') as f:
+            json.dump(self.known_enemies, f, indent=2)
+
+    def add_bullets(self, enemy_id, bullets):
         if enemy_id not in self.enemies:
-            if not self.is_test:
-                asyncio.create_task(self.clear_enemy(enemy_id))
-            self.enemies[enemy_id] = {}
-        obj = {
-            'pos_x': pos_x,
-            'pos_y': pos_y,
-            'updated': time.time(),
-            'dist': self.dist(pos_x, pos_y),
-            'id': enemy_id,
-        }
-        self.enemies[enemy_id].update(obj)
-        self.enemies[enemy_id].setdefault('bullets', {}).update(bullets)
-        self.handle_enemy(self.enemies[enemy_id])
+            self.mark_as_enemy(enemy_id)
+            self.add_enemy(self.all_objects[enemy_id])
+        enemy = self.enemies[enemy_id]
+        enemy.bullets.update(bullets)
+        self.handle_enemy(enemy)
+
+    def add_enemy(self, obj):
+        if obj.id not in self.enemies:
+            self.enemies[obj.id] = obj
+        obj.updated = time.time()
+        obj.dist = self.dist(*obj.pos)
+        self.handle_enemy(obj)
 
     def aim_closest(self):
         e = self.get_closest_enemy()
@@ -431,9 +475,8 @@ class State:
 
     def set_mypos(self, pos_x, pos_y):
         self.mypos = [pos_x, pos_y]
-        for k, v in self.enemies.items():
-            dist = self.dist(v['pos_x'], v['pos_y'])
-            v['dist'] = dist
+        for enemy in self.enemies.values():
+            enemy.dist = self.dist(*enemy.pos)
 
     def count_packet(self, payload):
         _type = struct.unpack('!B', payload[:1])[0]
@@ -442,6 +485,8 @@ class State:
     def close(self):
         print('State Run close')
         self.kill = True
+        self.local_writer.close()
+        self.remote_writer.close()
         if not self.log.closed:
             self.log.write(json.dumps(self.stats, indent=4, sort_keys=True))
             self.log.close()
@@ -451,6 +496,7 @@ class State:
             print(msg)
         if not self.log.closed:
             self.log.write(msg)
+            self.log.write('\n')
 
     @property
     def hp(self):

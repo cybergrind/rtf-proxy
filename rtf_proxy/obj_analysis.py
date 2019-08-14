@@ -1,6 +1,7 @@
 import asyncio
 import glob
 import struct
+import time
 
 from rtf_proxy import const
 from rtf_proxy.const import STATUS
@@ -21,7 +22,12 @@ class GameObject:
         self.entry = entry
         self.payload = payload
         self.dct = {}
+        self.dist = 1000
+        self.updated = time.time()
+        self.bullets = {}
+        self._obj_type = None
         self.decode_object(entry.object)
+
 
     reset_flags = ~(
         STATUS.SILENT
@@ -42,6 +48,38 @@ class GameObject:
     set_flags = STATUS.DAMAGING | STATUS.BERSERK | STATUS.SPEEDY
 
     @property
+    def msg_type(self):
+        if hasattr(self.entry, 'obj_type'):
+            return 79
+        return 85
+
+    @property
+    def obj_type(self):
+        if self._obj_type:
+            return self._obj_type
+        if hasattr(self.entry, 'obj_type'):
+            self._obj_type = self.entry.obj_type
+            return self.entry.obj_type
+
+    @property
+    def type_str(self):
+        obj_type = self.obj_type
+        if obj_type:
+            return str(obj_type)
+
+    @property
+    def name(self):
+        return self.dct.get('name')
+
+    @property
+    def id(self):
+        return self.entry.id
+
+    @property
+    def pos(self):
+        return self.entry.pos_x, self.entry.pos_y
+
+    @property
     def position(self):
         if self._position:
             return self._position
@@ -50,6 +88,10 @@ class GameObject:
         b = struct.pack('!Iff', self.entry.id, self.entry.pos_x, self.entry.pos_y)
         self._position = self.payload.find(b)
         return self._position
+
+    @property
+    def status(self):
+        return STATUS(self.dct.get('status', 0))
 
     def fix_items(self):
         if not hasattr(self.entry, 'pos_x') or not self.dct['0x9']:
@@ -80,12 +122,19 @@ class GameObject:
             )
 
     def decode_object(self, obj):
-        if self.entry.id in self.state.enemies and hasattr(self.entry, 'pos_x'):
-            self.state.add_enemy(self.entry.id, self.entry.pos_x, self.entry.pos_y, {})
+        if self.id in self.state.enemies:
+            self.state.add_enemy(self)
+
+        self.dct = decode_object(obj)
+        self.state.add_object(self)
+
+        if self.msg_type == 79:
+            if self.state.is_enemy(self):
+                self.state.add_enemy(self)
 
         if obj.num_fields == 0:
             return
-        self.dct = decode_object(obj)
+
 
         name = self.dct.get('name')
         add_bag = True
@@ -107,9 +156,9 @@ class GameObject:
 
         if self.state.me and self.state.me.entry.id == self.entry.id:
             self.state.update_me_dct(self.dct)
-            _type = struct.unpack('!B', self.payload[:1])[0]
-            if len(self.dct) > 2:
-                print(f'Ptype: {_type} => {self.dct}')
+            # _type = struct.unpack('!B', self.payload[:1])[0]
+            # if len(self.dct) > 2:
+            #     print(f'Ptype: {_type} => {self.dct}')
             if self.dct.get('status'):
                 self.reset_effects()
                 # import ipdb; ipdb.set_trace()
@@ -138,6 +187,16 @@ class GameObject:
     def process_location(self, obj):
         # print(f'GOT LOCATION => {self.dct["name"]} => {self.dct} [{self.entry.pos_x} / {self.entry.pos_y}]')
         return
+
+    def update_from_old(self, old_obj):
+        if not self.obj_type and old_obj.obj_type:
+            self._obj_type = old_obj.obj_type
+
+        dct = old_obj.dct
+        dct.update(self.dct)
+        self.dct.update(dct)
+        if old_obj.name:
+            assert self.name
 
 
 async def artificial_status(state, writer):
@@ -245,16 +304,16 @@ def analyze_objects(state, payload):
     if hasattr(obj, 'end_entity'):
         other_dct = decode_object(obj.end_entity)
         if other_dct:
-            state.log_write(f'New end_entity: {other_dct}\n')
+            state.log_write(f'New end_entity: {other_dct}')
             dct_w = {}
             for k, v in other_dct.items():
                 if 'bag_' in k or 'slot_' in k or 'item_' in k:
                     if not isinstance(v, const.ITEM) and v != 'empty':
                         dct_w[k] = v
             if dct_w:
-                state.log_write('unk_dct: \n')
+                state.log_write('unk_dct:')
                 for k, v in dct_w.items():
-                    state.log_write(f'    {k} = {v}\n')
+                    state.log_write(f'    {k} = {v}')
             state.update_me_dct(other_dct)
             payload = handle_my_stats(payload, other_dct)
             payload = handle_my_inventory(payload, other_dct)

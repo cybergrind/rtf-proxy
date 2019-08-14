@@ -442,6 +442,8 @@ class ITEM(IntEnum):
     SWORD_UT_ILLU_F6 = 8963
     DAG_T1 = 2581
     WAND_T12 = 2806
+    DAG_T2 = 2674
+    SWORD_T2 = 2669
 
     @staticmethod
     def get(value):
