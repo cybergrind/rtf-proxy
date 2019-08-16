@@ -229,10 +229,11 @@ async def in_loop(state, reader, writer):
             # skip = True
             # unp75(payload)
             # save_packet(state, payload)
-            pass
+            state.handle_enemy()
         elif _type == 40:
             # AOE shot
             process_aoe_shot(state, payload)
+            state.handle_enemy()
         elif _type == 36:
             process_aoe_dmg(state, payload)
         elif _type == 78:
@@ -243,11 +244,7 @@ async def in_loop(state, reader, writer):
             pass
         if _type in (79, 85):
             payload = analyze_objects(state, payload)
-            if b'cybergrind' in payload:
-                # print('REPLACE!!!!')
-                # payload.replace(b'\x00\x08\x00\x00#g', b'\x00\x08\x00\x00#h')
-                # payload.replace(b'\x06110601|\x00\x00\x00$', b'\x06110601|\x00\x00\x00\x88')
-                pass
+            state.handle_enemy()
         if not state.hp_safe:
             state.close()
         # print(f'Got payload: {payload}')

@@ -79,6 +79,10 @@ class GameObject:
     def pos(self):
         return self.entry.pos_x, self.entry.pos_y
 
+    def __str__(self):
+        td = time.time() - self.updated
+        return f'<GO {hex(hash(self))}:{self.id} / up: {td:.3f} / d: {self.state.dist(*self.pos)} {self.pos}>'
+
     @property
     def position(self):
         if self._position:
@@ -213,6 +217,8 @@ class GameObject:
         self.dct.update(dct)
         if old_obj.name:
             assert self.name
+        # if self.id in self.state.enemies and self.dist < 20:
+        #     print(f'Update from old: {self} <= {old_obj} : {self.dct}')
         assert len(self.dct) >= len(old_obj.dct), f'{self.dct} vs {old_obj.dct}'
 
 
@@ -314,8 +320,10 @@ def analyze_objects(state, payload):
     _type = struct.unpack('!B', payload[:1])[0]
     if _type not in (79, 85):
         print(f'Wrong packet in analyze_objects: {_type}')
+        raise NotImplementedError
     obj = log_unpack(state, unpackers[_type], payload)
     if not obj:
+        raise NotImplementedError
         return bytes(payload)
     # print('ok packet')
     if hasattr(obj, 'ts'):

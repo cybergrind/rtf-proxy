@@ -444,6 +444,10 @@ class ITEM(IntEnum):
     WAND_T12 = 2806
     DAG_T2 = 2674
     SWORD_T2 = 2669
+    WAND_T2 = 2672
+    BOW_T2 = 2587
+    RING_PURE_F5 = 9061
+    STAFF_UT_SERPENT_F2 = 3093
 
     @staticmethod
     def get(value):
@@ -455,8 +459,9 @@ class ITEM(IntEnum):
 I = ITEM
 
 SKULLS = {
-    I.SKULL_CHOCO: {'type': 'dmg'},
-    I.SKULL_TORMENT: {'type': 'hp'},
+    I.SKULL_CHOCO: {'type': 'dmg', 'radius': 4.5},
+    I.SKULL_TORMENT: {'type': 'hp', 'radius': 1.75},
+    I.SKULL_T5: {'type': 'hp', 'radius': 3.75},
 }
 
 SKILL = [I.SKULL_CHOCO, I.SKULL_TORMENT]

@@ -9,7 +9,9 @@ import time
 from collections import defaultdict
 
 import rtf_proxy.const
-from packet_tools import payload_to_packet
+from rtf_proxy.const import STATUS
+from rtf_proxy.density import max_density
+from rtf_proxy.packet_tools import payload_to_packet
 from rtf_proxy import const
 
 TOLERATE = 20  # AOE memory
@@ -21,6 +23,12 @@ def without(dct, *keys):
 
 ENEMIES_FILE = 'known_enemies.json'
 OBJS_FILE = 'known_objects.json'
+
+
+def dist(pos1, pos2):
+    tx, ty = pos1
+    x, y = pos2
+    return math.sqrt((tx - x) ** 2 + (ty - y) ** 2)
 
 class State:
     def __init__(self, is_test=False):
@@ -249,9 +257,52 @@ class State:
             to_id=self.curr_skulls['passive'],
         )
 
-    def handle_enemy(self, enemy):
-        if enemy.status and (enemy.status & const.STATUS.INVULN):
+    def is_vulnerable(self, obj):
+        try:
+            return not (obj.status and (obj.status & STATUS.INVULN))
+        except Exception:
+            print(f'Obj status: {obj.status}')
+            return True
+
+    def handle_enemies(self):
+        max_dist = 12
+        out = list(self.enemies.values())
+        if out:
+            t = time.time()
+            out = list(filter(lambda x: self.is_vulnerable(x) and x.dist < max_dist and t - x.updated < 3, out))
+            out.sort(key=lambda x: x.dist)
+        else:
             return
+
+        if len(out) == 0:
+            return
+
+        skull = const.SKULLS[self.curr_skulls['active']]
+        radius = skull['radius']
+
+        if len(out) == 1:
+            # print(f'Shot to single: {out[0]} => {out[0].pos}')
+            self.skull_shot(out[0].pos)
+        elif len(out) == 2:
+            e1, e2 = out
+            if dist(e1.pos, e2.pos) <= radius * 2:
+                x1, y1 = e1.pos
+                x2, y2 = e2.pos
+                point = (x1 + x2) / 2, (y1 + y2) / 2
+            else:
+                point = e1.pos
+            self.skull_shot(point)
+        else:
+            points = [x.pos for x in out]
+
+            point = max_density(self.mypos, points, max_dist, radius)
+            _dist = self.dist(*point)
+            _dist2 = dist(point, points[0])
+            # print(f'Calculated point: {point}. My point: {self.mypos} => {points} [d: {_dist} / d2: {_dist2}]')
+            if _dist < 16:
+                self.skull_shot(point)
+
+    def handle_enemy(self):
         if self.mode == 'necro':
             # self.warn_message(f'Handle enemy: mp: {self.me.dct["mp"]} d: {enemy.dist}')
             # print(
@@ -262,9 +313,7 @@ class State:
                 mp_level = 120
 
             if self.me.dct['mp'] > mp_level:
-                if enemy.dist < 13:
-                    # print(f'Shot they: {enemy.id}: {enemy.status} / {enemy.dct}')
-                    self.skull_shot(enemy.pos)
+                self.handle_enemies()
         self.handle_mode()
 
     def add_bag(self, bag):
@@ -402,8 +451,7 @@ class State:
         return 0
 
     def dist(self, tx, ty):
-        x, y = self.mypos
-        return math.sqrt((tx - x) ** 2 + (ty - y) ** 2)
+        return dist((tx, ty), self.mypos)
 
     def get_angle(self, tx, ty):
         x, y = self.mypos
@@ -420,7 +468,14 @@ class State:
         if _id in self.all_objects:
             old = self.all_objects[_id]
             obj.update_from_old(old)
+            # self.log_write(f'Update: {obj} <= {old}')
+        else:
+            # self.log_write(f'Add totally new object: {obj}')
+            pass
+
         self.all_objects[_id] = obj
+        if _id in self.enemies:
+            self.enemies[_id] = obj
 
         if obj.type_str and obj.name and obj.type_str not in self.known_objects:
             self.known_objects[obj.type_str] = obj.name
@@ -457,14 +512,14 @@ class State:
             self.add_enemy(self.all_objects[enemy_id])
         enemy = self.enemies[enemy_id]
         enemy.bullets.update(bullets)
-        self.handle_enemy(enemy)
+        # print(f'Add bullets: {enemy_id} {bullets} / {enemy} / {enemy.dct} - {self.mypos}')
+        # enemy.updated = time.time()
 
     def add_enemy(self, obj):
         if obj.id not in self.enemies:
             self.enemies[obj.id] = obj
         obj.updated = time.time()
         obj.dist = self.dist(*obj.pos)
-        self.handle_enemy(obj)
 
     def aim_closest(self):
         e = self.get_closest_enemy()
