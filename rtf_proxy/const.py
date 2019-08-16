@@ -448,6 +448,14 @@ class ITEM(IntEnum):
     BOW_T2 = 2587
     RING_PURE_F5 = 9061
     STAFF_UT_SERPENT_F2 = 3093
+    SKULL_T6 = 2859
+    ROBE_T13 = 2821
+    WAND_T11 = 2695
+    QUIVER_T2 = 2659
+    RING_SNAKE = 2625
+    SNAKE_OIL = 2623
+    DAG_UT_SPIRIT_F4 = 3113
+    POISON_UT_PLAGUE_F6 = 3181
 
     @staticmethod
     def get(value):
@@ -462,6 +470,11 @@ SKULLS = {
     I.SKULL_CHOCO: {'type': 'dmg', 'radius': 4.5},
     I.SKULL_TORMENT: {'type': 'hp', 'radius': 1.75},
     I.SKULL_T5: {'type': 'hp', 'radius': 3.75},
+    I.SKULL_T6: {'type': 'hp', 'radius': 3.75},
+}
+
+POISONS = {
+    I.POISON_UT_PLAGUE_F6: {'radius': 7.5},
 }
 
 SKILL = [I.SKULL_CHOCO, I.SKULL_TORMENT]
@@ -484,7 +497,8 @@ AUTOPICKUP = [I.SPD, I.ATT, I.MANA, I.HP, I.DEX, I.SPECIAL_CRATE, I.SKULL_CHOCO,
               I.HELM_T6, I.EPIC_QUEST_CHEST, I.PRISM_T6,
               I.RING_MYST_ENCOUNTER, I.ABYSS_KEY, I.WIS_6,
               I.BOOK_T6, I.UDL_KEY,
-              I.SWORD_UT_ILLU_F6,
+              I.SWORD_UT_ILLU_F6, I.SKULL_T6,
+              I.DAG_UT_SPIRIT_F4, I.POISON_UT_PLAGUE_F6,
               ]
 AUTOUSE_ON_FULL = [I.SPD, I.ATT, I.MANA, I.HP, I.DEX, I.CHAR_UNLOCKER, I.CHEST_UNLOCKER,
                    I.SPECIAL_CRATE]

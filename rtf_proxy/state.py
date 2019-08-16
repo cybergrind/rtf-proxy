@@ -61,6 +61,7 @@ class State:
         self.mode = None
         self.pending_switch = False
         self.shot_allowed = True
+        self.ability_sleep = 0.15
         self.all_objects = {}
         self.known_enemies = {}
         self.known_objects = {}
@@ -165,6 +166,10 @@ class State:
                     num = 8
                 self.loot = num
                 self.warn_message(f'Set loot to: {num}')
+            elif command.startswith('/sin'):
+                skip = True
+                self.sin_mode()
+                self.warn_message(f'Enable Asassin mode: skull {self.me.dct["item_2"]!r}')
             elif command.startswith('/necr'):
                 skip = True
                 self.necro_mode()
@@ -177,7 +182,7 @@ class State:
             self.warn_message(f'Command exception: {e}')
         return skip
 
-    def skull_shot(self, target=None):
+    def ability_shot(self, target=None):
         if self.location in const.NO_ACTION:
             return
 
@@ -187,7 +192,7 @@ class State:
         ts = self.gen_ts()
         who = self.me.entry.id
         idx = 1
-        item = self.me.dct['item_1']
+        item = self.me.dct['item_2']
         if not target:
             pos_x = self.mypos[0] + 1
             pos_y = self.mypos[1] + 1
@@ -201,11 +206,16 @@ class State:
 
     async def after_shot(self):
         self.shot_allowed = False
-        await asyncio.sleep(0.15)
+        await asyncio.sleep(self.ability_sleep)
         self.shot_allowed = True
+
+    def sin_mode(self):
+        self.mode = 'sin'
+        self.ability_sleep = 0.7
 
     def necro_mode(self):
         self.mode = 'necro'
+        self.ability_sleep = 0.15
         self.skulls = {'hp': None, 'dmg': None}
         self.all_skulls = {}
         self.curr_skulls = {'active': None, 'passive': None}
@@ -264,7 +274,7 @@ class State:
             print(f'Obj status: {obj.status}')
             return True
 
-    def handle_enemies(self):
+    def handle_enemies(self, radius):
         max_dist = 12
         out = list(self.enemies.values())
         if out:
@@ -277,12 +287,9 @@ class State:
         if len(out) == 0:
             return
 
-        skull = const.SKULLS[self.curr_skulls['active']]
-        radius = skull['radius']
-
         if len(out) == 1:
             # print(f'Shot to single: {out[0]} => {out[0].pos}')
-            self.skull_shot(out[0].pos)
+            self.ability_shot(out[0].pos)
         elif len(out) == 2:
             e1, e2 = out
             if dist(e1.pos, e2.pos) <= radius * 2:
@@ -291,7 +298,7 @@ class State:
                 point = (x1 + x2) / 2, (y1 + y2) / 2
             else:
                 point = e1.pos
-            self.skull_shot(point)
+            self.ability_shot(point)
         else:
             points = [x.pos for x in out]
 
@@ -300,7 +307,7 @@ class State:
             _dist2 = dist(point, points[0])
             # print(f'Calculated point: {point}. My point: {self.mypos} => {points} [d: {_dist} / d2: {_dist2}]')
             if _dist < 16:
-                self.skull_shot(point)
+                self.ability_shot(point)
 
     def handle_enemy(self):
         if self.mode == 'necro':
@@ -313,7 +320,14 @@ class State:
                 mp_level = 120
 
             if self.me.dct['mp'] > mp_level:
-                self.handle_enemies()
+                skull = const.SKULLS[self.curr_skulls['active']]
+                radius = skull['radius']
+                self.handle_enemies(radius)
+        elif self.mode == 'sin':
+            mp_level = 170
+            if self.me.dct['mp'] > mp_level:
+                radius = 7.5  # plague
+                self.handle_enemies(radius)
         self.handle_mode()
 
     def add_bag(self, bag):

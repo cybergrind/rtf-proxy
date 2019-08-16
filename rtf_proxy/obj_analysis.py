@@ -215,6 +215,8 @@ class GameObject:
         dct = old_obj.dct
         dct.update(self.dct)
         self.dct.update(dct)
+        old_obj.bullets.update(self.bullets)
+        self.bullets.update(old_obj.bullets)
         if old_obj.name:
             assert self.name
         # if self.id in self.state.enemies and self.dist < 20:
@@ -323,7 +325,6 @@ def analyze_objects(state, payload):
         raise NotImplementedError
     obj = log_unpack(state, unpackers[_type], payload)
     if not obj:
-        raise NotImplementedError
         return bytes(payload)
     # print('ok packet')
     if hasattr(obj, 'ts'):
