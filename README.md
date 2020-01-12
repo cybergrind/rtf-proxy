@@ -32,3 +32,5 @@ swfdecompress client.swf
 abcexport client.swf
 rabcdasm client-1.abc
 ```
+
+Packets analysis with https://ide.kaitai.io/
