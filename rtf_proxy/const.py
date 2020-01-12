@@ -349,7 +349,7 @@ class ITEM(IntEnum):
     SHIELD_T2 = 2570
     BOW_T3 = 2678
     HP_T1 = 2599
-    ARMOR_T13 = 2812
+    UNK_ARMOR = 2812
     POISON_T2 = 2725
     SCEPTER_T2 = 2863
     SKULL_T1 = 2731
@@ -456,6 +456,11 @@ class ITEM(IntEnum):
     SNAKE_OIL = 2623
     DAG_UT_SPIRIT_F4 = 3113
     POISON_UT_PLAGUE_F6 = 3181
+    ARMOR_T13 = 2809
+    HP_T5 = 2765
+    MINI_NODESTONE = 21876
+    DAGGER_UT_VOID_F7 = 21129
+    POISON_UT_TROLL_F7 = 22362
 
     @staticmethod
     def get(value):
@@ -475,6 +480,7 @@ SKULLS = {
 
 POISONS = {
     I.POISON_UT_PLAGUE_F6: {'radius': 7.5},
+    I.POISON_UT_TROLL_F7: {'radius': 5}
 }
 
 SKILL = [I.SKULL_CHOCO, I.SKULL_TORMENT]
@@ -498,7 +504,9 @@ AUTOPICKUP = [I.SPD, I.ATT, I.MANA, I.HP, I.DEX, I.SPECIAL_CRATE, I.SKULL_CHOCO,
               I.RING_MYST_ENCOUNTER, I.ABYSS_KEY, I.WIS_6,
               I.BOOK_T6, I.UDL_KEY,
               I.SWORD_UT_ILLU_F6, I.SKULL_T6,
-              I.DAG_UT_SPIRIT_F4, I.POISON_UT_PLAGUE_F6,
+              I.HP_T5, I.SWORD_UT_FANG_F6,
+              # assassin
+              I.DAG_UT_SPIRIT_F4, I.POISON_UT_PLAGUE_F6, I.DAGGER_UT_VOID_F7, I.POISON_UT_TROLL_F7,
               ]
 AUTOUSE_ON_FULL = [I.SPD, I.ATT, I.MANA, I.HP, I.DEX, I.CHAR_UNLOCKER, I.CHEST_UNLOCKER,
                    I.SPECIAL_CRATE]

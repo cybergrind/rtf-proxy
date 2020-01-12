@@ -177,8 +177,8 @@ def process_hit_ack(state, payload):
     if bullet_id not in enemy.bullets:
         if len(enemy.bullets) == 0:
             print(f'Cannot find any bullets. Skip: {payload} => {enemy.dct} {enemy} / {bullet_id}')
-            raise Exception
-            return
+            # raise Exception
+            # return
         print(f'Cannot find bullet: {bullet_id} in {enemy}. Use: {payload}')
         bullet_dmg = 300  # no bullet dmg
     else:

@@ -306,7 +306,7 @@ def handle_my_stats(state, payload, dct):
 
     state.log_write('Update stats')
     replace(0x16, 'SPD', 96)
-    replace(0x1c, 'DEX', min(dct['DEX'] + 25, 240))
+    replace(0x1c, 'DEX', max(min(dct['DEX'] + 25, 240), 140))
     # replace(0x1b, 'WIS', min(dct['WIS'] + 300, 840))
     return payload
 

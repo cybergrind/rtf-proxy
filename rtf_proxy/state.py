@@ -52,7 +52,7 @@ class State:
         self.packet_id = 0
         self.ts = 0
         self.ts_ensure_bigger = -1
-        self.last_ts = 0
+        self.last_ts = int(time.time() * 1000)
         self.to_send = []
         self.scheduled = {}
         self.prev_49 = None
@@ -211,7 +211,7 @@ class State:
 
     def sin_mode(self):
         self.mode = 'sin'
-        self.ability_sleep = 0.7
+        self.ability_sleep = 0.15
 
     def necro_mode(self):
         self.mode = 'necro'
@@ -326,6 +326,9 @@ class State:
         elif self.mode == 'sin':
             mp_level = 170
             if self.me.dct['mp'] > mp_level:
+                if self.me.dct["item_2"] not in const.POISONS:
+                    return
+                const.POISONS[self.me.dct["item_2"]]['radius']
                 radius = 7.5  # plague
                 self.handle_enemies(radius)
         self.handle_mode()
